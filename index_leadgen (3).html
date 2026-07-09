@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOPILOT · Simulateur Rémunération SEL 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,400..800;125,600..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#001F6E; --coral:#FF6E6E; --gold:#FFB559;
+  --ink:#001F6E; --ink-2:#4A5680; --paper:#F7F7FB; --card:#FFFFFF; --line:#E2E4EF;
+  --poche:#E08A12; --poche-bg:#FFF3E0;
+  --social:#E85555; --social-bg:#FFECEC;
+  --etat:#33479E; --etat-bg:#E9ECF8;
+  --sel:#001F6E; --sel-bg:#E7EAF6;
+  --radius:14px;
+  font-size:15px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Instrument Sans',sans-serif;background:var(--paper);color:var(--ink);line-height:1.45;-webkit-font-smoothing:antialiased}
+.num{font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3,.disp{font-family:'Archivo',sans-serif}
+
+/* ===== Shell ===== */
+.shell{display:grid;grid-template-columns:390px 1fr;min-height:100vh}
+@media(max-width:980px){.shell{grid-template-columns:1fr}}
+
+/* ===== Cockpit (inputs) ===== */
+.cockpit{background:var(--navy);color:#EDF0EA;padding:26px 24px 60px;position:relative}
+.cockpit::after{content:"";position:absolute;top:0;right:0;bottom:0;width:6px;background:linear-gradient(180deg,var(--gold),var(--coral))}
+.brand{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+.brand .k{font-family:'Archivo',sans-serif;font-weight:800;font-stretch:125%;font-size:1.5rem;letter-spacing:.04em;color:#fff}
+.brand img{height:44px;display:block;border-radius:8px}
+.brand .tag{font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:#8D99C9}
+.cockpit .sub{font-size:.78rem;color:#8D99C9;margin-bottom:22px}
+.grp{margin-bottom:20px;border:1px solid #2A3D81;border-radius:var(--radius);overflow:hidden}
+.grp>summary{list-style:none;cursor:pointer;padding:11px 14px;font-family:'Archivo',sans-serif;font-weight:700;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:#D4DAF2;background:#00175A;display:flex;justify-content:space-between;align-items:center}
+.grp>summary::after{content:"▾";color:#7D89BE;transition:.2s}
+.grp:not([open])>summary::after{transform:rotate(-90deg)}
+.grp .bd{padding:14px}
+.f{margin-bottom:13px}
+.f label{display:flex;justify-content:space-between;font-size:.78rem;color:#B9C2E4;margin-bottom:5px}
+.f label .val{color:#fff;font-family:'Spline Sans Mono',monospace;font-weight:600}
+.f input[type=number],.f select{width:100%;background:#001151;border:1px solid #33479E;border-radius:9px;color:#fff;padding:9px 11px;font-family:'Spline Sans Mono',monospace;font-size:.95rem;outline:none}
+.f input:focus,.f select:focus{border-color:var(--gold)}
+.f input[type=range]{width:100%;accent-color:var(--coral);height:26px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;background:#001151;border:1px solid #33479E;color:#B9C2E4;border-radius:9px;padding:8px 4px;font-size:.75rem;cursor:pointer;font-family:'Instrument Sans',sans-serif}
+.seg button.on{background:var(--coral);border-color:var(--coral);color:#fff;font-weight:600}
+.hint{font-size:.7rem;color:#7D89BE;margin-top:4px}
+.warn{background:#40122E;border:1px solid var(--coral);color:#FFC4C4;font-size:.75rem;padding:8px 10px;border-radius:9px;margin-top:8px;display:none}
+.warn.show{display:block}
+
+/* ===== Deck (results) ===== */
+.deck{padding:28px 34px 80px;max-width:1040px}
+@media(max-width:980px){
+  .deck{padding:18px 12px 110px}
+  .cockpit{padding:20px 16px 26px}
+  .kpis{grid-template-columns:1fr 1fr;gap:9px}
+  .kpi{padding:11px 12px}.kpi .v{font-size:1.12rem}
+  .deck-head h1{font-size:1.08rem}
+  .tbl{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl td,.tbl th{padding:7px 9px;font-size:.76rem;white-space:nowrap}
+  .tbl td:first-child{white-space:normal;min-width:150px}
+  .fluxbar{height:44px}.fluxbar div span{font-size:.6rem}
+  .f input[type=number],.f select,.brand+*+* input{font-size:16px}
+  #i_nom{font-size:16px!important}
+  .f input[type=range]{height:34px}
+  .tabs button{padding:9px 11px;font-size:.76rem}
+  .cmp{grid-template-columns:1fr}
+  .btn{width:100%;text-align:center}
+  .deck-head{flex-direction:column;align-items:stretch}
+}
+/* Barre mobile fixe : net en poche toujours visible pendant les réglages */
+#stickybar{display:none}
+@media(max-width:980px){
+  #stickybar{display:flex;position:fixed;left:0;right:0;bottom:0;background:var(--navy);color:#fff;z-index:50;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));align-items:center;justify-content:space-between;gap:10px;
+    box-shadow:0 -6px 24px rgba(0,31,110,.35)}
+  #stickybar .sb{line-height:1.15}
+  #stickybar .sb .l{font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:#8D99C9}
+  #stickybar .sb .v{font-family:'Spline Sans Mono',monospace;font-weight:600;font-size:1rem;color:var(--gold)}
+  #stickybar button{background:var(--coral);border:none;color:#fff;font-family:'Archivo',sans-serif;font-weight:700;
+    font-size:.72rem;padding:11px 14px;border-radius:10px;white-space:nowrap}
+}
+.deck-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.deck-head h1{font-weight:800;font-stretch:125%;font-size:1.35rem;letter-spacing:.01em}
+.deck-head .who{font-size:.8rem;color:var(--ink-2)}
+.btn{border:none;border-radius:10px;padding:11px 18px;font-family:'Archivo',sans-serif;font-weight:700;font-size:.8rem;letter-spacing:.06em;cursor:pointer}
+.btn.pdf{background:var(--coral);color:#fff}
+.btn.pdf:hover{background:#E85555}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--line);margin-bottom:22px}
+.tabs button{background:none;border:none;padding:10px 16px;font-family:'Archivo',sans-serif;font-weight:600;font-size:.82rem;color:var(--ink-2);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.tabs button.on{color:var(--ink);border-color:var(--coral)}
+.pane{display:none}.pane.on{display:block}
+
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.kpi .l{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:6px}
+.kpi .v{font-family:'Spline Sans Mono',monospace;font-weight:600;font-size:1.35rem}
+.kpi .s{font-size:.72rem;color:var(--ink-2);margin-top:3px}
+.kpi.poche{border-top:4px solid var(--poche)} .kpi.poche .v{color:var(--poche)}
+.kpi.social{border-top:4px solid var(--social)} .kpi.social .v{color:var(--social)}
+.kpi.etat{border-top:4px solid var(--etat)} .kpi.etat .v{color:var(--etat)}
+.kpi.sel{border-top:4px solid var(--sel)} .kpi.sel .v{color:var(--sel)}
+
+/* Flux bar (signature) */
+.flux{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:22px}
+.flux h2{font-size:.95rem;font-weight:700;margin-bottom:4px}
+.flux .sub{font-size:.78rem;color:var(--ink-2);margin-bottom:14px}
+.fluxbar{display:flex;height:52px;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.fluxbar div{transition:width .5s cubic-bezier(.4,0,.2,1);position:relative;min-width:0}
+.fluxbar div span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Spline Sans Mono',monospace;font-size:.72rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden}
+.fx-cot{background:var(--coral)} .fx-is{background:#33479E} .fx-ir{background:var(--navy)} .fx-poche{background:var(--gold)} .fx-poche span{color:var(--navy)!important} .fx-res{background:#A9B4DE} .fx-res span{color:var(--navy)!important} .fx-adm{background:#6E7691}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:.75rem;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* Tables */
+.tbl{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:22px;font-size:.85rem}
+.tbl caption{text-align:left;font-family:'Archivo',sans-serif;font-weight:700;font-size:.95rem;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0}
+.tbl th{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);text-align:right;padding:9px 14px;background:#FBFCFA;border-bottom:1px solid var(--line)}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl td{padding:8px 14px;border-bottom:1px solid #EFF1EC;text-align:right}
+.tbl td.n{font-family:'Spline Sans Mono',monospace}
+.tbl tr.tot td{font-weight:700;background:#FBFCFA;border-top:2px solid var(--ink)}
+.tbl tr.sub td{color:var(--ink-2);font-size:.8rem}
+
+/* Lead-gen : verrous & bannière */
+.lgbanner{background:linear-gradient(90deg,#FFB559,#FF6E6E);color:#001F6E;font-family:'Archivo',sans-serif;font-weight:700;font-size:.8rem;padding:10px 18px;text-align:center}
+.lgbanner a{color:#001F6E;text-decoration:underline}
+.lockwrap{position:relative;min-height:360px}
+.lockwrap .lockcontent{filter:blur(7px);pointer-events:none;user-select:none}
+.lockovl{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(247,247,251,.55);border-radius:14px;text-align:center;padding:30px}
+.lockovl h3{font-size:1.05rem;color:var(--navy)}
+.lockovl p{font-size:.85rem;color:var(--ink-2);max-width:480px}
+.lockovl .cta{background:var(--coral);color:#fff;border:none;border-radius:12px;padding:13px 26px;font-family:'Archivo',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;text-decoration:none;box-shadow:0 6px 20px rgba(255,110,110,.4)}
+.lockovl .cta:hover{background:#e85555}
+/* Comparateur */
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-bottom:22px}
+.strat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.strat.best{border:2px solid var(--gold);box-shadow:0 6px 24px rgba(255,181,89,.3)}
+.strat h3{font-size:.85rem;margin-bottom:2px}
+.strat .d{font-size:.72rem;color:var(--ink-2);margin-bottom:12px}
+.strat .big{font-family:'Spline Sans Mono',monospace;font-weight:600;font-size:1.5rem;color:var(--poche)}
+.strat .pct{font-size:.75rem;color:var(--ink-2);margin-bottom:10px}
+.strat .row{display:flex;justify-content:space-between;font-size:.78rem;padding:4px 0;border-bottom:1px dashed #EFF1EC}
+.strat .row b{font-family:'Spline Sans Mono',monospace;font-weight:500}
+.badge{display:inline-block;background:var(--gold);color:var(--navy);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:20px;margin-bottom:8px;font-weight:700}
+.minibar{height:8px;border-radius:4px;background:#EFF1EC;margin:8px 0 4px;overflow:hidden}
+.minibar i{display:block;height:100%;background:var(--gold)}
+.cmpbar{display:flex;height:11px}
+.cmpbar i{display:block;height:100%;background:var(--gold);flex:none}
+.strat .row.sub2 span{color:var(--ink-2);padding-left:12px;font-size:.73rem}
+.strat .ctrl{font-size:.68rem;color:var(--ink-2);margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
+.cmplegend{display:flex;flex-wrap:wrap;gap:12px;font-size:.74rem;color:var(--ink-2);margin:-8px 0 16px}
+.cmplegend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* PER */
+.per-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:18px}
+.per-card h2{font-size:.95rem;margin-bottom:10px}
+.gauge{height:14px;background:#EFF1EC;border-radius:7px;overflow:hidden;margin:6px 0}
+.gauge i{display:block;height:100%;background:linear-gradient(90deg,var(--coral),var(--gold))}
+
+/* Params */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.pgrid .f label{color:var(--ink-2)}
+.pgrid .f input{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.note{font-size:.75rem;color:var(--ink-2);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+
+/* ===== Report (off-screen render + print) ===== */
+#report{display:none;background:#fff;color:#111;font-size:11px}
+#report.rendering{display:block;position:fixed;left:-12000px;top:0;width:794px;z-index:-1}
+#report .rp{padding:34px 38px;width:794px;min-height:1122px;background:#fff;box-sizing:border-box}
+#report .rhead{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #001F6E;padding-bottom:8px;margin-bottom:16px}
+#report .rhead img{height:34px;border-radius:6px}
+#report h2{font-family:'Archivo',sans-serif;font-size:14px;margin:14px 0 8px;color:#001F6E}
+#report table{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:10px}
+#report th{text-align:right;font-size:8.5px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1.5px solid #001F6E;padding:4px 6px;color:#001F6E}
+#report td{text-align:right;padding:3.5px 6px;border-bottom:.5px solid #ddd;font-family:'Spline Sans Mono',monospace;font-size:10px}
+#report th:first-child,#report td:first-child{text-align:left;font-family:'Instrument Sans',sans-serif}
+#report tr.tot td{font-weight:700;border-top:1.5px solid #001F6E}
+#report .rkpis{display:flex;gap:10px;margin:10px 0}
+#report .rkpi{flex:1;border:1px solid #ccc;border-radius:8px;padding:8px 10px}
+#report .rkpi .l{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:#555}
+#report .rkpi .v{font-family:'Spline Sans Mono',monospace;font-weight:600;font-size:14px}
+#report .rfoot{font-size:8px;color:#777;border-top:1px solid #ccc;padding-top:6px;margin-top:14px}
+#report .fluxbar{height:36px;display:flex;border-radius:6px;overflow:hidden}
+#report .fluxbar div{position:relative}
+#report .fluxbar div span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Spline Sans Mono',monospace;font-size:8.5px;font-weight:600;white-space:nowrap;overflow:hidden}
+#report .legend{font-size:8.5px;display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
+#report .legend i{width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:3px;vertical-align:-1px}
+@media print{
+  body{background:#fff}
+  .shell,.noprint{display:none!important}
+  #report{display:block}
+  #report .rp{page-break-after:always;min-height:auto}
+  #report .rp:last-child{page-break-after:auto}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div class="lgbanner noprint">Simulation indicative gratuite — barèmes 2026 sous réserve des textes définitifs. L'étude complète, personnalisée et engageante est réalisée par <b>Kopilot Finance</b> · <a href="#" onclick="lgCTA();return false">Prendre rendez-vous</a></div>
+<div class="shell">
+
+<!-- ============ COCKPIT ============ -->
+<aside class="cockpit">
+  <div class="brand"><img src="data:image/png;base64,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" alt="Kopilot"><span class="tag">Finance · v3.1 LG</span></div>
+  <div class="sub">Simulateur rémunération &amp; optimisation · SEL 2026 · build v3.1-leadgen</div>
+
+  <details class="grp" open>
+    <summary>Dossier client</summary>
+    <div class="bd">
+      <div class="f"><label>Nom du praticien</label><input type="text" id="i_nom" value="Dr Exemple" style="width:100%;background:#001151;border:1px solid #33479E;border-radius:9px;color:#fff;padding:9px 11px;font-size:.9rem"></div>
+      <div class="f"><label>Profession</label>
+        <select id="i_prof">
+          <option value="dentiste">Chirurgien-dentiste (CARCDSF)</option>
+          <option value="med_s1">Médecin secteur 1 (CARMF)</option>
+          <option value="med_s2">Médecin secteur 2 (CARMF)</option>
+          <option value="kine">Kinésithérapeute (CARPIMKO)</option>
+          <option value="pharmacien">Pharmacien titulaire (CAVP)</option>
+        </select>
+      </div>
+      <div class="f"><label>Part de l'activité conventionnée (%)</label><input type="number" id="i_conv" value="80" min="0" max="100" step="5"><div class="hint">Ratio URSSAF (honoraires conventionnés / recettes totales). Repères : dentiste ~80%, médecin S1 100%, S2 ~90%, kiné ~95%, non conventionné 0%. Pilote la prise en charge CPAM et la contribution 3,25%.</div></div>
+      <div class="f"><label>IJ / revenus de remplacement perçus (€/an)</label><input type="number" id="i_ijp" value="0" step="500"><div class="hint">IJ maladie/maternité : incluses dans l'assiette des cotisations mais pas dans la base CSG (précomptée à la source)</div></div>
+      <div class="f"><label>Forme juridique</label>
+        <div class="seg" id="i_forme">
+          <button data-v="selarl" class="on">SELARL (gérant maj., TNS)</button>
+          <button data-v="selas">SELAS (président, salarié)</button>
+        </div>
+        <div class="hint" id="h_forme">SELARL : cotisations TNS ~30-40%, dividendes &gt;10% du capital soumis à cotisations. SELAS : charges salariales+patronales ~75-80% du brut, mais dividendes jamais soumis à cotisations.</div>
+      </div>
+      <div class="f"><label>Situation familiale</label>
+        <div class="seg" id="i_situ">
+          <button data-v="celib">Célibataire</button>
+          <button data-v="marie" class="on">Marié / Pacsé</button>
+          <button data-v="isole">Parent isolé</button>
+        </div>
+      </div>
+      <div class="f"><label>Nombre d'enfants à charge</label><input type="number" id="i_enf" value="2" min="0" max="8"></div>
+      <div class="f"><label>Autres revenus nets imposables du foyer (€)</label><input type="number" id="i_autres" value="0" step="1000"><div class="hint">Salaire du conjoint après abattement 10%, fonciers nets…</div></div>
+      <div class="f"><label>Réductions d'impôt (€) — non restituables</label><input type="number" id="i_red" value="0" step="500"><div class="hint">Dons, Pinel, FIP… perdues si l'IR est insuffisant</div></div>
+      <div class="f"><label>Crédits d'impôt (€) — restituables</label><input type="number" id="i_cred" value="0" step="500"><div class="hint">Emploi à domicile, garde d'enfants… remboursés même sans IR</div></div>
+    </div>
+  </details>
+
+  <details class="grp" open>
+    <summary>La SEL</summary>
+    <div class="bd">
+      <div class="f"><label>Résultat avant rémunération du dirigeant (€)</label><input type="number" id="i_res" value="250000" step="5000"><div class="hint">EBE disponible : honoraires − charges d'exploitation (hors rému &amp; cotisations du praticien)</div></div>
+      <div class="f"><label>Capital social + primes + CC associé moyen (€)</label><input type="number" id="i_cap" value="10000" step="1000"><div class="hint">Seuil des 10% : dividendes au-delà soumis à cotisations TNS</div></div>
+      <div class="f"><label>Part rémunération technique BNC <span class="val" id="v_split"></span></label><input type="range" id="i_split" min="0" max="100" value="95" step="5"><div class="hint">Depuis 2023 : rému de l'activité libérale = BNC (sans abattement 10%), solde = gérance art. 62</div></div>
+      <div class="f"><label>Surcoût administratif SEL (€/an)</label><input type="number" id="i_adm" value="2000" step="500"></div>
+      <div class="f"><label>Calage dossier réel : revenu brut social cible (€)</label><input type="number" id="i_brutcible" value="0" step="500"><div class="hint">Ligne DD de la 2035 (ou courrier URSSAF). Renseigné, la rémunération se résout automatiquement pour reproduire ce brut social — mettre 0 pour piloter librement.</div></div>
+      <div class="f"><label>Première année d'activité (création / passage en SEL)</label>
+        <div class="seg" id="i_an1">
+          <button data-v="non" class="on">Non — régime de croisière</button>
+          <button data-v="oui">Oui — 1ère année</button>
+        </div>
+        <div class="hint">Année 1 : cotisations appelées sur base forfaitaire (19% du PASS), la vraie cotisation est régularisée en N+1 — l'outil chiffre la dette à provisionner.</div>
+      </div>
+    </div>
+  </details>
+
+  <details class="grp" open>
+    <summary>Train de vie &amp; pilotage</summary>
+    <div class="bd">
+      <div class="f"><label>Mode de pilotage de la rémunération</label>
+        <div class="seg" id="i_mode">
+          <button data-v="manuel" class="on">Montant net saisi</button>
+          <button data-v="tdv">Calé sur le train de vie</button>
+        </div>
+        <div class="hint">« Montant net » : vous fixez la rémunération ci-dessous. « Calé » : elle s'ajuste automatiquement au minimum couvrant le besoin (après IR et PER, dividendes nets inclus).</div>
+      </div>
+      <div id="remfields"><div class="f"><label>Rémunération versée par la SEL (nette de cotisations, avant IR) <span class="val" id="v_rem"></span></label><div style="display:flex;gap:8px;align-items:center">
+        <input type="range" id="i_rem" min="0" max="400000" value="100000" step="1000" style="flex:1">
+        <input type="number" id="i_rem_n" value="100000" step="1000" style="width:104px;flex:none">
+      </div></div></div>
+      <div id="tdvfields">
+      <div class="f"><label>Train de vie mensuel net (€)</label>
+        <div class="seg" id="i_tdvpre" style="margin-bottom:7px">
+          <button data-v="10000" class="on">10 k€</button>
+          <button data-v="15000">15 k€</button>
+          <button data-v="20000">20 k€</button>
+        </div>
+        <input type="number" id="i_tdv" value="10000" step="500">
+      </div>
+      <div class="f"><label>Marge de sécurité <span class="val" id="v_marge"></span></label><input type="range" id="i_marge" min="0" max="40" value="15" step="5"><div class="hint">Coussin sur le besoin : imprévus, impôts locaux, variations d'activité</div></div>
+      <div style="background:#001151;border:1px solid #33479E;border-radius:9px;padding:10px 12px;font-size:.78rem;color:#B9C2E4;margin-bottom:10px">
+        Besoin annuel net : <b style="color:#fff" class="num" id="p_besoin">—</b><br>
+        Couverture par le mix actuel : <b class="num" id="p_couv">—</b>
+        <div id="p_pont" style="margin-top:7px;padding-top:7px;border-top:1px dashed #33479E;line-height:1.5"></div>
+      </div>
+      <button id="btn_cale" style="width:100%;background:var(--gold);border:none;color:var(--navy);font-family:'Archivo',sans-serif;font-weight:700;font-size:.8rem;padding:11px;border-radius:9px;cursor:pointer">🎯 Caler la rémunération sur le train de vie</button>
+      <div class="hint" style="margin-top:6px">Calcule la rémunération minimale couvrant le besoin après IR et PER (les dividendes nets saisis comptent dans la couverture) — le surplus reste en société.</div>
+      </div>
+    </div>
+  </details>
+
+  <details class="grp" open>
+    <summary>Dividendes</summary>
+    <div class="bd">
+      
+      <div class="f"><label>Dividendes bruts distribués <span class="val" id="v_div"></span></label><div style="display:flex;gap:8px;align-items:center">
+        <input type="range" id="i_div" min="0" max="300000" value="20000" step="1000" style="flex:1">
+        <input type="number" id="i_div_n" value="20000" step="1000" style="width:104px;flex:none">
+      </div></div>
+      <div class="f"><label>Imposition des dividendes</label>
+        <div class="seg" id="i_pfu">
+          <button data-v="pfu" class="on">PFU 30%</button>
+          <button data-v="bareme">Barème (abatt. 40%)</button>
+        </div>
+      </div>
+      <div class="warn" id="w_div"></div>
+    </div>
+  </details>
+
+  <details class="grp" open>
+    <summary>Épargne retraite (PER / Madelin)</summary>
+    <div class="bd">
+      <div class="f"><label>Versement PER individuel (€/an) <span class="val" id="v_per"></span></label><input type="range" id="i_per" min="0" max="90000" value="10000" step="500"></div>
+      <div class="f"><label>Canal de déduction du PER</label>
+        <div class="seg" id="i_per_canal">
+          <button data-v="154bis" class="on">Pro — art. 154 bis</button>
+          <button data-v="perso">Personnel — 163 quaterd.</button>
+        </div>
+        <div class="hint">154 bis : plafond plus généreux (tranche 15%) mais versement <b>réintégré dans l'assiette sociale</b>. Personnel : plafond 10% seulement, mais <b>hors cotisations</b>.</div>
+      </div>
+      <div class="f"><label>Plafonds PER non utilisés N-1 à N-3 (€)</label><input type="number" id="i_per_rel" value="0" step="1000"><div class="hint">Ligne « Plafond épargne retraite » de l'avis d'imposition — reportable 3 ans</div></div>
+      <div class="f"><label>Plafond du conjoint mutualisé (€)</label><input type="number" id="i_per_cj" value="0" step="1000"><div class="hint">Marié/Pacsé uniquement — mutualisation cochée sur la 2042 (case 6QR)</div></div>
+      <div class="f"><label>Prévoyance / santé Madelin (€/an)</label><input type="number" id="i_mad" value="3000" step="500"><div class="hint">Contrats déductibles art. 154 bis — réintégrés dans l'assiette sociale</div></div>
+    </div>
+  </details>
+</aside>
+
+<!-- ============ DECK ============ -->
+<main class="deck">
+  <div class="deck-head">
+    <div><h1>Où va chaque euro de votre SEL&nbsp;?</h1><div class="who" id="d_who"></div></div>
+    <div style="display:flex;gap:8px"><button class="btn noprint" onclick="if(confirm('Réinitialiser toutes les valeurs ?'))location.reload()" style="background:#E9ECF8;color:var(--navy)">↺</button>
+    <button class="btn pdf noprint" onclick="lgCTA()">📅 Recevoir mon étude complète (PDF) — RDV Kopilot</button></div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi sel"><div class="l">Coût global praticien / SEL</div><div class="v num" id="k_cout">—</div><div class="s" id="k_cout_s">rému + cotisations + prévoyance</div></div>
+    <div class="kpi social"><div class="l">Cotisations sociales</div><div class="v num" id="k_cot">—</div><div class="s" id="k_cot_s">caisse + URSSAF + CSG</div></div>
+    <div class="kpi etat"><div class="l">Impôts (IS + IR + PFU)</div><div class="v num" id="k_imp">—</div><div class="s" id="k_imp_s"></div></div>
+    <div class="kpi poche"><div class="l">Net dans la poche</div><div class="v num" id="k_net">—</div><div class="s" id="k_net_s"></div></div>
+  </div>
+
+  <div class="flux">
+    <h2>Flux de trésorerie — destination du résultat</h2>
+    <div class="sub" id="f_sub"></div>
+    <div class="fluxbar" id="fluxbar"></div>
+    <div class="legend">
+      <span><i style="background:var(--social)"></i>Cotisations sociales</span>
+      <span><i style="background:#33479E"></i>IS</span>
+      <span><i style="background:var(--navy)"></i>IR + PFU</span>
+      <span><i style="background:var(--poche)"></i>Net en poche</span>
+      <span><i style="background:#A9B4DE"></i>Réserves SEL</span>
+      <span><i style="background:#6E7691"></i>PER + frais</span>
+    </div>
+  </div>
+
+  <div class="tabs noprint">
+    <button class="on" data-t="t_detail">Détail cotisations</button>
+    <button data-t="t_ir">Impôt sur le revenu</button>
+    <button data-t="t_bnc">BNC vs SEL</button>
+    <button data-t="t_cmp">Comparateur stratégies</button>
+    <button data-t="t_traj">Trajectoire 10 ans</button>
+    <button data-t="t_multi">Multi-associés</button>
+    <button data-t="t_per">Optimisation PER</button>
+    <button data-t="t_param">Paramètres 2026</button>
+    <button data-t="t_aide">❓ Notice</button>
+  </div>
+
+  <section class="pane on" id="t_detail">
+    <div class="flux" id="alertes" style="border-left:5px solid var(--gold)"><h2>Alertes &amp; points de vigilance</h2><div id="alist" style="font-size:.83rem"></div></div>
+    <div id="an1zone"></div>
+    <table class="tbl" id="tbl_cout"></table>
+    <table class="tbl" id="tbl_cot"></table>
+    <table class="tbl" id="tbl_sel"></table>
+  </section>
+
+  <section class="pane" id="t_ir">
+    <table class="tbl" id="tbl_ir"></table>
+    <table class="tbl" id="tbl_div"></table>
+  </section>
+
+  <section class="pane" id="t_bnc">
+    <div class="note" id="b_note"></div>
+    <div class="kpis" id="b_kpis"></div>
+    <div class="flux">
+      <h2>Exercice individuel (BNC)</h2>
+      <div class="sub" id="b_sub1"></div>
+      <div class="fluxbar" id="fluxbnc"></div>
+    </div>
+    <div class="flux">
+      <h2>SEL à l'IS — votre mix actuel</h2>
+      <div class="sub" id="b_sub2"></div>
+      <div class="fluxbar" id="fluxsel"></div>
+      <div class="legend">
+        <span><i style="background:var(--social)"></i>Cotisations</span>
+        <span><i style="background:var(--navy)"></i>IR (+ PFU)</span>
+        <span><i style="background:#33479E"></i>IS</span>
+        <span><i style="background:#6E7691"></i>PER + Madelin + frais</span>
+        <span><i style="background:#A9B4DE"></i>Réserves SEL</span>
+        <span><i style="background:var(--poche)"></i>Net en poche</span>
+      </div>
+    </div>
+    <table class="tbl" id="tbl_bnc"></table>
+  </section>
+
+  <section class="pane" id="t_cmp">
+    <div class="note"><b>Comment lire :</b> le dénominateur commun de toutes les cartes est le même résultat de <b id="c_res"></b> avant rémunération. Chaque stratégie ne fait que <b>répartir ce même gâteau</b> entre quatre destinations : votre poche (net + PER), les prélèvements (cotisations, IS, IR, fiscalité des dividendes), les réserves laissées dans la SEL, et la protection/frais (Madelin, surcoût admin). La barre colorée de chaque carte montre cette répartition — les quatre blocs somment toujours au résultat. Un «&nbsp;net en poche&nbsp;» faible (ex. capitalisation) n'est pas de l'argent perdu : il est en réserves, à fiscalité de sortie à arbitrer (onglet Trajectoire). Le PER saisi est appliqué à chaque scénario. Attention : «&nbsp;max dividendes&nbsp;» réduit aussi les droits retraite et la prévoyance.</div>
+    <div class="cmp" id="cmp"></div>
+    <table class="tbl" id="tbl_cmp"></table>
+  </section>
+
+  <section class="pane" id="t_traj">
+    <div class="note">Projection pluriannuelle des 4 stratégies à résultat constant. Hypothèse centrale : vous prélevez votre <b>train de vie</b>, tout le surplus travaille — épargne personnelle, PER capitalisé, réserves placées dans la SEL (rendement net d'IS). La valeur des réserves est affichée <b>nette de la fiscalité de sortie</b> choisie.</div>
+    <div class="flux">
+      <h2>Hypothèses de projection</h2>
+      <div class="pgrid" style="margin-top:10px">
+        <div class="f"><label style="color:var(--ink-2)">Horizon (années)</label><select id="j_hor" style="background:#fff;border:1px solid var(--line);color:var(--ink)"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
+        <div class="f"><label style="color:var(--ink-2)">Train de vie annuel (modifiable dans « Pilotage », mode calé)</label><div class="num" id="j_tdv_show" style="padding:9px 11px;background:#EEF0F8;border-radius:9px;font-weight:600">—</div></div>
+        <div class="f"><label style="color:var(--ink-2)">Rendement épargne perso, net de fiscalité (%)</label><input type="number" id="j_rp" value="3" step="0.5" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+        <div class="f"><label style="color:var(--ink-2)">Rendement PER, net de frais (%)</label><input type="number" id="j_rper" value="4" step="0.5" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+        <div class="f"><label style="color:var(--ink-2)">Rendement placements SEL, brut (%)</label><input type="number" id="j_rsel" value="3" step="0.5" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+        <div class="f"><label style="color:var(--ink-2)">Sortie des réserves à l'horizon</label><select id="j_exit" style="background:#fff;border:1px solid var(--line);color:var(--ink)"><option value="0.30" selected>Dividendes PFU (−30%)</option><option value="0.172">Cession départ retraite — abatt. 500 K€, PS seuls (−17,2%)</option><option value="0">Conservées en société (brut)</option></select></div>
+      </div>
+    </div>
+    <div class="flux">
+      <h2>Patrimoine net constitué par stratégie</h2>
+      <div class="sub" id="j_sub"></div>
+      <svg id="trajsvg" viewBox="0 0 740 320" style="width:100%;height:auto;display:block"></svg>
+      <div class="legend" id="j_leg"></div>
+      <div style="font-size:.78rem;color:var(--ink-2);margin-top:10px;padding:10px 12px;background:#FBFCFA;border:1px solid var(--line);border-radius:9px">
+      <b>Comment lire :</b> chaque courbe = une stratégie répétée à l'identique chaque année. La hauteur = tout ce que vous avez accumulé à cette date (épargne personnelle + PER + réserves de la société, déjà nettes de l'impôt de sortie choisi ci-dessus). Plus la courbe finit haut, plus la stratégie vous enrichit — à train de vie identique. Changez « Sortie des réserves » : c'est elle qui décide si capitaliser (courbes E/F) bat distribuer (A/B/C/D).</div>
+    </div>
+    <div class="kpis" id="j_kpis"></div>
+    <table class="tbl" id="tbl_traj"></table>
+  </section>
+
+  <section class="pane" id="t_multi">
+    <div class="note">Plusieurs praticiens dans la même SEL (même profession et forme juridique que le dossier). Le résultat, le capital et les frais sont ceux saisis dans le panneau. Chaque associé a sa rémunération, sa part du capital (= sa part des dividendes et son seuil de 10%), et son foyer fiscal. Les dividendes totaux sont répartis au prorata des parts.</div>
+    <div class="flux">
+      <h2>Associés <button onclick="multiAdd()" style="float:right;background:var(--gold);border:none;border-radius:8px;padding:5px 12px;font-family:'Archivo',sans-serif;font-weight:700;cursor:pointer">+ Associé</button></h2>
+      <div class="f" style="max-width:260px;margin-top:8px"><label style="color:var(--ink-2)">Dividendes totaux distribués (€)</label><input type="number" id="m_div" value="0" step="5000" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+      <div id="m_rows"></div>
+    </div>
+    <table class="tbl" id="tbl_multi"></table>
+    <table class="tbl" id="tbl_multi_sel"></table>
+  </section>
+
+  <section class="pane" id="t_per">
+    <div class="per-card">
+      <h2>Plafond de déduction épargne retraite 2026 (art. 154 bis / 163 quatervicies)</h2>
+      <div class="row" style="display:flex;justify-content:space-between;font-size:.85rem"><span>Plafond Madelin retraite calculé sur votre rémunération</span><b class="num" id="p_plaf">—</b></div>
+      <div class="gauge"><i id="p_gauge" style="width:0%"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--ink-2)"><span id="p_use">—</span><span id="p_rest">—</span></div>
+    </div>
+    <div class="per-card">
+      <h2>Effet levier fiscal de votre versement PER</h2>
+      <table class="tbl" id="tbl_per" style="margin-bottom:0"></table>
+    </div>
+    <div class="per-card">
+      <h2>Simulation : et si vous versiez le plafond ?</h2>
+      <div id="p_max" style="font-size:.85rem"></div>
+    </div>
+  </section>
+
+  <section class="pane" id="t_aide">
+    <div class="flux"><h2>Prise en main express</h2>
+    <div style="font-size:.85rem;line-height:1.6">1️⃣ <b>Dossier client</b> : profession, forme juridique (SELARL/SELAS), foyer. 2️⃣ <b>La SEL</b> : résultat avant rémunération (= EBE hors rému et cotisations du praticien), capital pour le seuil des 10%. 3️⃣ Choisir le <b>mode de pilotage</b> : montant net libre, ou calé sur le train de vie (la rému se calcule seule). 4️⃣ Ajuster <b>dividendes et PER</b>. 5️⃣ Lire la barre de flux et les <b>alertes</b>, comparer les onglets, puis <b>⬇ PDF</b>.</div></div>
+    <table class="tbl"><caption>Guide champ par champ</caption>
+      <tr><th style="text-align:left">Champ</th><th style="text-align:left">Quoi saisir</th></tr>
+      <tr><td>Forme juridique</td><td style="text-align:left">SELARL gérant majoritaire (TNS) ou SELAS président (assimilé salarié). Change tout : cotisations, dividendes, retraite.</td></tr>
+      <tr><td>Résultat avant rémunération</td><td style="text-align:left">Honoraires − charges d'exploitation (loyer, salaires, prothésiste…) HORS rému/cotisations du praticien. Dans Pennylane : EBE avant rémunération de gérance.</td></tr>
+      <tr><td>Capital + primes + CC associé</td><td style="text-align:left">Seuil des 10% (SELARL) : dividendes au-delà = cotisations TNS. Capital social + primes + solde moyen du compte courant.</td></tr>
+      <tr><td>Part BNC / art. 62</td><td style="text-align:left">SELARL uniquement. Depuis 2023 : activité de soins = BNC (sans 10%), mandat de gérant = art. 62 (10%). 90-95% BNC = hypothèse prudente.</td></tr>
+      <tr><td>Autres revenus du foyer</td><td style="text-align:left">Salaire net imposable du conjoint, fonciers nets… positionne la vraie TMI du foyer.</td></tr>
+      <tr><td>Train de vie + marge</td><td style="text-align:left">Dépenses personnelles réelles + coussin. L'encadré montre le pont : rému versée − IR − PER = net disponible.</td></tr>
+      <tr><td>Rémunération versée</td><td style="text-align:left">Nette de cotisations (payées en sus par la SEL), AVANT votre IR personnel.</td></tr>
+      <tr><td>Dividendes bruts</td><td style="text-align:left">Montant voté en AG — plafonné automatiquement au distribuable après IS.</td></tr>
+      <tr><td>PER / Madelin</td><td style="text-align:left">PER : versement personnel déductible (plafond contrôlé, onglet dédié). Madelin prévoyance : primes payées par la SEL.</td></tr>
+    </table>
+    <div class="flux"><h2>Comprendre les 3 sorties d'argent</h2>
+    <div style="font-size:.85rem;line-height:1.6">
+    <b style="color:var(--coral)">1. Rémunération</b> : cotisations + IR au barème tout de suite, mais la seule route qui achète <b>retraite, IJ, invalidité</b> et ouvre le plafond PER.<br><br>
+    <b style="color:#33479E">2. Dividendes annuels</b> : IS puis flat tax 30% chaque année. Zéro droit social. En SELARL, gare au seuil des 10% ; en SELAS, jamais de cotisations dessus.<br><br>
+    <b style="color:var(--poche)">3. Réserves</b> : IS payé, puis rien tant que l'argent reste en société. Le coût tombe <b>à la sortie</b> : 30% en flat tax (autant distribuer chaque année !), ou beaucoup moins avec une sortie optimisée — cession départ retraite (PS 17,2% seuls), dividendes étalés à TMI faible, SPFPL. C'est le sélecteur de l'onglet Trajectoire.<br><br>
+    <b>Règle Kopilot</b> : rému calée sur le train de vie réel (jamais sous 1 PASS = 48 060 €), surplus capitalisé avec une stratégie de sortie.</div></div>
+    <div class="note">Précision du moteur : <b>assiette sociale réformée</b> (LFSS 2024) — cotisations et CSG calculées sur le <b>revenu brut social</b> (rémunération SANS déduction des cotisations, celles portées par la SEL étant réintégrées, + Madelin + PER + dividendes &gt; 10% du capital) diminué de l'<b>abattement forfaitaire de 26%</b> (plancher 1,76% PASS / plafond 130% PASS), résolu par itération cotisations ↔ brut. SELARL par tranches (barèmes caisses 2026), SELAS en tranches réelles Agirc-Arrco T1/T2 (mandataire : pas de chômage/AGS), <b>PUMa chiffrée</b>, <b>CDHR</b> (plancher 20% du RFR), mode <b>1ère année</b> avec trésorerie de régularisation. Restent hors périmètre : CFE, frais réels, situations familiales particulières, multi-associés. Toute décision est validée par l'expert-comptable signataire — Kopilot Compta, Mickhaël Amsellem.</div>
+  </section>
+
+  <section class="pane" id="t_param">
+    <div class="note">Paramètres légaux 2026 extraits du simulateur de l'Ordre des Experts-Comptables (v28/05/2026). Modifiables pour tester une hypothèse — la simulation se recalcule en direct.</div>
+    <div class="pgrid" id="pgrid"></div>
+  </section>
+</main>
+</div>
+
+<div id="stickybar" class="noprint">
+  <div class="sb"><div class="l">Net en poche</div><div class="v" id="sb_net">—</div></div>
+  <div class="sb"><div class="l">Prélèvements</div><div class="v" id="sb_prel" style="color:#FF9C9C">—</div></div>
+</div>
+
+<!-- ============ RAPPORT PDF ============ -->
+<div id="report"></div>
+<script>
+/* ================= PARAMÈTRES LÉGAUX 2026 =================
+   Source : Simulateur OEC Professions Libérales v28/05/2026 */
+const P = {
+  PASS: 48060,
+  abat_tx: 0.26, abat_min: 845.86, abat_max: 62478,
+  // Maladie TNS (décret 2024-688) : taux progressif jusqu'à 3 PASS, 6,5% au-delà
+  mal_pts: [[0,0.015],[0.4,0.04],[0.6,0.065],[3.0,0.085]],  // linéaire 6,5%→8,5% entre 0,6 et 3 PASS (calé sur régularisations URSSAF réelles)
+  mal_t2: 0.065,
+  mal_charge_conv: 0.001,      // part à charge praticien conventionné (0,10%)
+  mal_contrib_add: 0.0325,     // contribution additionnelle sur dépassements / non conventionné
+  ij_tx: 0.003, ij_min_p: 0.4, ij_max_p: 3,
+  af_s1: 1.1, af_s2: 1.4, af_tx: 0.031,
+  csg_ded: 0.068, csg_nd: 0.029,
+  formation_tx: 0.0025,
+  rb_t1: 0.0873, rb_t2: 0.0187, rb_min: 5409,
+  // CARCDSF (chirurgiens-dentistes)
+  cd_rco_forf: 3210.6, cd_rco_tx: 0.1135, cd_rco_s1: 31239, cd_rco_base_max: 195465,
+  cd_pcv_forf: 1663.6, cd_pcv_tx: 0.00725, cd_pcv_plaf: 240300,
+  cd_id: 1235, cd_urps: 0.003,
+  // CARMF (médecins)
+  mf_rco_tx: 0.118, mf_rco_plaf: 168210,
+  mf_asv_f1: 1917, mf_asv_f2: 5751, mf_asv_t1: 0.013333, mf_asv_t2: 0.04, mf_asv_plaf: 240300,
+  mf_id_base: 626, mf_id_tx: 0.004, mf_id_max: 1010,
+  mf_curps: 0.001,
+  mf_p1: 0.0215, mf_p2: 0.0151, mf_p3: 0.0112, // participation CPAM S1 (art. 96-3)
+  // IS
+  is_t1: 0.15, is_seuil: 42500, is_t2: 0.25,
+  // IR 2026 (revenus 2025)
+  bar: [[0,11600,0],[11601,29579,0.11],[29580,84577,0.30],[84578,181917,0.41],[181918,Infinity,0.45]],
+  qf_plaf: 1807, qf_isole: 4275,
+  dec_s_c: 1982, dec_s_m: 3277, dec_v_c: 896.86, dec_v_m: 1482.84, dec_tx: 0.4525,
+  abat10_max: 14555, abat10_min: 509,
+  pfu_ir: 0.128, ps_tx: 0.172, div_abat: 0.40,
+  cehr: [[250000,500000,0.03],[500000,Infinity,0.04]],
+  per_min_p: 0.10, per_tx1: 0.10, per_tx2: 0.15,
+  // CARPIMKO (kinés, auxiliaires médicaux)
+  kp_rco_tx: 0.087, kp_rco_s1: 24030, kp_rco_base_max: 120150,
+  kp_id: 1022, kp_asv_forf: 224, kp_asv_tx: 0.0016, kp_curps: 0.001,
+  // CAVP (pharmaciens titulaires)
+  vp_repart: 7657, vp_id: 696,
+  vp_classes: [[0,2906],[85370,4359],[103032,5812],[120695,7265],[138357,8718],[156020,10171],[173682,11624],[191345,13077],[209007,14530],[226670,15983],[244331,17436]],
+  // SELAS - assimilé salarié : barème réel 2026 (mandataire social : pas de chômage/AGS)
+  as_mal: 0.13, as_vp_p: 0.0855, as_vd_p: 0.0202, as_af: 0.0525,
+  as_arrco1_p: 0.0472, as_arrco2_p: 0.1295, as_ceg1_p: 0.0129, as_ceg2_p: 0.0162, as_cet_p: 0.0014,
+  as_at: 0.009, as_autres_p: 0.0163,            // FNAL 0,10 + CSA 0,30 + formation 0,55 + apprentissage 0,68
+  as_vp_s: 0.069, as_vd_s: 0.004,
+  as_arrco1_s: 0.0315, as_arrco2_s: 0.0864, as_ceg1_s: 0.0086, as_ceg2_s: 0.0108, as_cet_s: 0.0014,
+  as_apec: 0.0004,
+  // PUMa (cotisation subsidiaire maladie)
+  puma_tx: 0.065, puma_seuil_act: 0.20, puma_abat_cap: 0.50, puma_cap_max: 8,
+  // CDHR (imposition minimale 20% des hauts revenus, LF2025 reconduite)
+  cdhr_on: 1, cdhr_seuil_c: 250000, cdhr_seuil_m: 500000, cdhr_tx: 0.20, cdhr_decote: 0.825, cdhr_maj_pac: 1500, cdhr_maj_couple: 12500,
+  // Première année : assiette forfaitaire provisionnelle
+  forfait_debut: 0.19
+};
+function cotisationsSELAS(brut){
+  const T1 = Math.min(brut, P.PASS), T2 = clamp(brut - P.PASS, 0, 7*P.PASS), TA = brut;
+  const baseCSG = 0.9825*Math.min(brut, 4*P.PASS) + Math.max(0, brut - 4*P.PASS);
+  const cet = brut > P.PASS ? 1 : 0;
+  const L = [];
+  const add = (lbl, base, tx, cat) => { const m = base*tx; L.push([lbl, base, pct(tx), m, cat]); return m; };
+  let pat = 0, sal = 0;
+  pat += add('Maladie-maternité (patronale)', TA, P.as_mal, 'Patronal');
+  pat += add('Vieillesse plafonnée (patronale)', T1, P.as_vp_p, 'Patronal');
+  pat += add('Vieillesse déplafonnée (patronale)', TA, P.as_vd_p, 'Patronal');
+  pat += add('Allocations familiales', TA, P.as_af, 'Patronal');
+  pat += add('Agirc-Arrco T1 (patronale)', T1, P.as_arrco1_p, 'Patronal');
+  if (T2>0) pat += add('Agirc-Arrco T2 (patronale)', T2, P.as_arrco2_p, 'Patronal');
+  pat += add('CEG T1 (patronale)', T1, P.as_ceg1_p, 'Patronal');
+  if (T2>0) pat += add('CEG T2 (patronale)', T2, P.as_ceg2_p, 'Patronal');
+  if (cet) pat += add('CET (patronale)', TA, P.as_cet_p, 'Patronal');
+  pat += add('Accidents du travail', TA, P.as_at, 'Patronal');
+  pat += add('FNAL, CSA, formation, apprentissage', TA, P.as_autres_p, 'Patronal');
+  sal += add('Vieillesse plafonnée (salariale)', T1, P.as_vp_s, 'Salarial');
+  sal += add('Vieillesse déplafonnée (salariale)', TA, P.as_vd_s, 'Salarial');
+  sal += add('Agirc-Arrco T1 (salariale)', T1, P.as_arrco1_s, 'Salarial');
+  if (T2>0) sal += add('Agirc-Arrco T2 (salariale)', T2, P.as_arrco2_s, 'Salarial');
+  sal += add('CEG T1 (salariale)', T1, P.as_ceg1_s, 'Salarial');
+  if (T2>0) sal += add('CEG T2 (salariale)', T2, P.as_ceg2_s, 'Salarial');
+  if (cet) sal += add('CET (salariale)', TA, P.as_cet_s, 'Salarial');
+  sal += add('APEC', Math.min(brut,4*P.PASS), P.as_apec, 'Salarial');
+  const csgD = baseCSG*P.csg_ded, csgN = baseCSG*P.csg_nd;
+  L.push(['CSG déductible (6,8%)', baseCSG, pct(P.csg_ded), csgD, 'Salarial']);
+  L.push(['CSG/CRDS non déductible (2,9%)', baseCSG, pct(P.csg_nd), csgN, 'Salarial']);
+  sal += csgD + csgN;
+  return { lignes:L, total: pat+sal, pat, sal, csgD, csgN, horsCsg: pat+sal-csgD-csgN, brut };
+}
+function brutFromNet(net){ // net = brut - salariales : recherche du brut
+  if (net<=0) return 0;
+  let lo=net, hi=net*1.6;
+  for(let i=0;i<40;i++){
+    const m=(lo+hi)/2, c=cotisationsSELAS(m);
+    (m - c.sal >= net) ? hi=m : lo=m;
+  }
+  return hi;
+}
+const fmt = n => (Math.round(n)).toLocaleString('fr-FR') + ' €';
+const pct = n => (n*100).toLocaleString('fr-FR',{maximumFractionDigits:1}) + ' %';
+const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
+
+/* ============ COTISATIONS TNS ============ */
+function malRate(A){ // taux progressif sur assiette ≤ 3 PASS
+  const r = A / P.PASS, pts = P.mal_pts;
+  if (r <= pts[0][0]) return pts[0][1];
+  for (let i=1;i<pts.length;i++){
+    if (r <= pts[i][0]){
+      const [x0,y0]=pts[i-1],[x1,y1]=pts[i];
+      return y0 + (y1-y0)*(r-x0)/(x1-x0);
+    }
+  }
+  return pts[pts.length-1][1];
+}
+function cotisations(A, prof, conv, ijp){ // A = assiette CSG ; conv = part conventionnée [0..1] ; ijp = IJ perçues (assiette cotisations uniquement)
+  const L = []; // [label, base, taux(txt), montant, cat]
+  const p3 = 3*P.PASS;
+  const convShare = clamp(conv==null ? 0.8 : conv, 0, 1); // part conventionnée du revenu (ratio URSSAF)
+  const Ac = A + Math.max(0, ijp||0); // assiette des COTISATIONS : + IJ/revenus de remplacement (la CSG y est précomptée)
+  if (ijp>0) L.push(['+ IJ / revenus de remplacement perçus (assiette cotisations, hors CSG)', 0, '', 0, 'Info']);
+  // --- Maladie
+  const b1 = Math.min(Ac, p3), r1 = malRate(Ac);
+  const b2 = Math.max(0, Ac - p3);
+  let mal;
+  if (prof === 'pharmacien'){
+    // Non PAMC : maladie TNS pleine, pas de logique conventionné
+    mal = b1*r1 + b2*P.mal_t2;
+    L.push(['Maladie-maternité (URSSAF)', Ac, pct(r1)+' / '+pct(P.mal_t2), mal, 'URSSAF']);
+  } else if (prof === 'med_s2'){
+    mal = b1*r1 + b2*P.mal_t2;
+    L.push(['Maladie-maternité (URSSAF)', Ac, pct(r1)+' / '+pct(P.mal_t2), mal, 'URSSAF']);
+    const dep = Ac*(1-convShare);
+    const ca = dep*P.mal_contrib_add;
+    L.push(['Contribution add. dépassements (3,25%)', dep, pct(P.mal_contrib_add), ca, 'URSSAF']);
+    mal += ca;
+  } else {
+    // conventionné (dentiste, médecin S1) : CPAM prend en charge, reste 0,10% sur part conventionnée
+    const pamc = (prof==='dentiste'||prof==='kine');
+    const malFull = b1*r1 + b2*(pamc?P.mal_contrib_add:P.mal_t2);
+    const qp = (b1*(r1-P.mal_charge_conv) + b2*((pamc?P.mal_contrib_add:P.mal_t2)-P.mal_charge_conv)) * convShare;
+    mal = malFull - qp;
+    L.push(['Maladie-maternité', Ac, pct(r1), malFull, 'URSSAF']);
+    if (convShare>0) L.push(['− Prise en charge CPAM (part conventionnée)', Ac*convShare, '', -qp, 'URSSAF']);
+    if (convShare < 1){
+      const dep = Ac*(1-convShare), ca = dep*P.mal_contrib_add;
+      L.push(['Contribution add. dépassements / non conventionné (3,25%)', dep, pct(P.mal_contrib_add), ca, 'URSSAF']);
+      mal += ca;
+    }
+  }
+  // --- IJ
+  const bij = Ac<=0 ? 0 : clamp(Ac, P.ij_min_p*P.PASS, P.ij_max_p*P.PASS);
+  const ij = bij*P.ij_tx;
+  L.push(['Indemnités journalières', bij, pct(P.ij_tx), ij, 'URSSAF']);
+  // --- Allocations familiales
+  const rA = Ac/P.PASS;
+  let afr = 0;
+  if (rA > P.af_s2) afr = P.af_tx;
+  else if (rA > P.af_s1) afr = P.af_tx*(rA-P.af_s1)/(P.af_s2-P.af_s1);
+  const af = Ac*afr;
+  L.push(['Allocations familiales', Ac, pct(afr), af, 'URSSAF']);
+  // --- CSG / CRDS
+  const csgD = A*P.csg_ded, csgN = A*P.csg_nd;
+  L.push(['CSG déductible (6,8%)', A, pct(P.csg_ded), csgD, 'CSG']);
+  L.push(['CSG/CRDS non déductible (2,9%)', A, pct(P.csg_nd), csgN, 'CSG']);
+  // --- Formation
+  const form = P.PASS*P.formation_tx;
+  L.push(['Contribution formation professionnelle', P.PASS, pct(P.formation_tx), form, 'URSSAF']);
+  // --- Retraite de base CNAVPL
+  const bT1 = Ac<=0?0:Math.max(Math.min(Ac,P.PASS), P.rb_min);
+  const rb1 = bT1*P.rb_t1;
+  const bT2 = clamp(Ac-P.PASS, 0, 4*P.PASS);
+  const rb2 = bT2*P.rb_t2;
+  L.push(['Retraite de base T1 (CNAVPL)', bT1, pct(P.rb_t1), rb1, 'Retraite']);
+  L.push(['Retraite de base T2', bT2, pct(P.rb_t2), rb2, 'Retraite']);
+  let caisse = 0, participation = 0;
+  if (prof === 'dentiste'){
+    const rcoP = clamp(Ac-P.cd_rco_s1, 0, P.cd_rco_base_max)*P.cd_rco_tx;
+    L.push(['CARCDSF complémentaire — forfait', 0, '', P.cd_rco_forf, 'Retraite']);
+    L.push(['CARCDSF complémentaire — proportionnelle', clamp(Ac-P.cd_rco_s1,0,P.cd_rco_base_max), pct(P.cd_rco_tx), rcoP, 'Retraite']);
+    const pcv = P.cd_pcv_forf + Math.min(Ac*convShare, P.cd_pcv_plaf)*P.cd_pcv_tx;
+    L.push(['PCV (part à charge, 1/3)', Math.min(Ac*convShare,P.cd_pcv_plaf), pct(P.cd_pcv_tx), pcv, 'Retraite']);
+    L.push(['Invalidité-décès CARCDSF', 0, '', P.cd_id, 'Retraite']);
+    const urps = Math.min(Ac, 5*P.PASS/3)*P.cd_urps;
+    L.push(['Cotisation URPS', Math.min(Ac,5*P.PASS/3), pct(P.cd_urps), urps, 'URSSAF']);
+    caisse = P.cd_rco_forf + rcoP + pcv + P.cd_id + urps;
+  } else if (prof === 'kine'){
+    const rcoP = clamp(Ac-P.kp_rco_s1, 0, P.kp_rco_base_max)*P.kp_rco_tx;
+    L.push(['CARPIMKO complémentaire (8,7% entre 0,5 et 3 PASS)', clamp(Ac-P.kp_rco_s1,0,P.kp_rco_base_max), pct(P.kp_rco_tx), rcoP, 'Retraite']);
+    const asv = P.kp_asv_forf + Math.min(Ac*convShare, 5*P.PASS)*P.kp_asv_tx;
+    L.push(['ASV (part à charge)', Math.min(Ac*convShare,5*P.PASS), pct(P.kp_asv_tx), asv, 'Retraite']);
+    L.push(['Invalidité-décès CARPIMKO', 0, '', P.kp_id, 'Retraite']);
+    const curps = Math.min(Ac, 5*P.PASS/3)*P.kp_curps;
+    L.push(['Cotisation CURPS', Math.min(Ac,5*P.PASS/3), pct(P.kp_curps), curps, 'URSSAF']);
+    caisse = rcoP + asv + P.kp_id + curps;
+  } else if (prof === 'pharmacien'){
+    let capi = P.vp_classes[0][1];
+    for (const [seuil, c] of P.vp_classes) if (Ac >= seuil) capi = c;
+    L.push(['CAVP répartition (forfait)', 0, '', P.vp_repart, 'Retraite']);
+    L.push(['CAVP capitalisation (classe selon revenu)', Ac, '', capi, 'Retraite']);
+    L.push(['Invalidité-décès CAVP', 0, '', P.vp_id, 'Retraite']);
+    caisse = P.vp_repart + capi + P.vp_id;
+  } else {
+    const rco = Math.min(Math.max(Ac,0), P.mf_rco_plaf)*P.mf_rco_tx;
+    L.push(['CARMF complémentaire (11,8%)', Math.min(Math.max(Ac,0),P.mf_rco_plaf), pct(P.mf_rco_tx), rco, 'Retraite']);
+    const s1 = prof==='med_s1';
+    const asvF = s1 ? P.mf_asv_f1 : P.mf_asv_f2;
+    const asvP = Math.min(Ac*convShare, P.mf_asv_plaf)*(s1?P.mf_asv_t1:P.mf_asv_t2);
+    L.push(['ASV forfait '+(s1?'(S1, 1/3 à charge)':'(S2)'), 0, '', asvF, 'Retraite']);
+    L.push(['ASV proportionnel', Math.min(Ac*convShare,P.mf_asv_plaf), pct(s1?P.mf_asv_t1:P.mf_asv_t2), asvP, 'Retraite']);
+    const id = Math.min(P.mf_id_base + clamp(Ac-P.PASS,0,2*P.PASS)*P.mf_id_tx, P.mf_id_max);
+    L.push(['Invalidité-décès CARMF', 0, '', id, 'Retraite']);
+    const curps = Math.min(Ac, 5*P.PASS/3)*P.mf_curps;
+    L.push(['Cotisation CURPS', Math.min(Ac,5*P.PASS/3), pct(P.mf_curps), curps, 'URSSAF']);
+    caisse = rco + asvF + asvP + id + curps;
+    if (s1){
+      participation = Ac <= 1.4*P.PASS ? Ac*P.mf_p1 : (Ac <= 2.5*P.PASS ? Ac*P.mf_p2 : Ac*P.mf_p3);
+      L.push(['− Participation CPAM art. 96-3 (S1)', Ac, '', -participation, 'URSSAF']);
+    }
+  }
+  const total = mal + ij + af + csgD + csgN + form + rb1 + rb2 + caisse - participation;
+  return { lignes:L, total, csgD, csgN, horsCsg: total - csgD - csgN };
+}
+
+/* ============ ASSIETTE & MOTEUR SEL ============ */
+/* Réforme LFSS 2024 (assiette unique) : le revenu BRUT social = rémunération SANS déduction
+   des cotisations et contributions sociales (celles prises en charge par la SEL sont donc
+   réintégrées), + Madelin + PER (art. 154 bis) + dividendes > 10% du capital.
+   L'abattement forfaitaire de 26% (plancher 1,76% PASS / plafond 130% PASS) REMPLACE
+   la déduction des cotisations. Cotisations et CSG-CRDS partagent cette assiette unique.
+   NB : cotisations ↔ brut social sont interdépendants → résolution par itération. */
+function assietteSociale(rem, cotReint, madelin, per, divTNS){
+  const brut = Math.max(0, rem + cotReint + madelin + per + divTNS);
+  if (brut <= 0) return {brut:0, abat:0, A:0};
+  const abat = clamp(brut*P.abat_tx, P.abat_min, P.abat_max);
+  return {brut, abat, A: Math.max(0, brut - abat)};
+}
+function impotIS(b){
+  if (b<=0) return 0;
+  return Math.min(b,P.is_seuil)*P.is_t1 + Math.max(0,b-P.is_seuil)*P.is_t2;
+}
+function bareme(RparPart){
+  let t=0;
+  for (const [a,b,r] of P.bar) if (RparPart > a-1) t += (Math.min(RparPart,b===Infinity?RparPart:b) - (a===0?0:a-1))*r;
+  return Math.max(0,t);
+}
+function irFoyer(revImposable, marie, enfants, isole){
+  const R = Math.max(0, revImposable);
+  const n0 = marie?2:1;
+  const demi0 = enfants<=2 ? enfants : 2 + (enfants-2)*2; // 0,5 part enfants 1-2, 1 part dès le 3e
+  const iso = (!marie && isole && enfants>0);             // case T : 1er enfant = part entière
+  const demi = demi0 + (iso?1:0);
+  const N = n0 + demi/2;
+  const ir1 = bareme(R/N)*N;
+  const plafQF = iso ? P.qf_isole + P.qf_plaf*(demi0-1) : P.qf_plaf*demi0;
+  const ir2 = bareme(R/n0)*n0 - plafQF;
+  let ir = demi>0 ? Math.max(ir1, ir2) : ir1;
+  // décote
+  const seuil = marie?P.dec_s_m:P.dec_s_c, val = marie?P.dec_v_m:P.dec_v_c;
+  if (ir < seuil) ir = Math.max(0, ir - Math.max(0, val - P.dec_tx*ir));
+  return ir;
+}
+function tmi(revImposable, marie, enfants, isole){
+  const n0 = marie?2:1;
+  let demi = enfants<=2?enfants:2+(enfants-2)*2;
+  if (!marie && isole && enfants>0) demi += 1;
+  const N = n0+demi/2, q = Math.max(0,revImposable)/N;
+  for (const [a,b,r] of P.bar) if (q>=a && q<=b) return r;
+  return 0.45;
+}
+function cehr(rfr, marie){
+  const s = marie?2:1;
+  let c=0;
+  for (const [a,b,r] of P.cehr){
+    const lo=a*s, hi=b===Infinity?Infinity:b*s;
+    if (rfr>lo) c += (Math.min(rfr,hi)-lo)*r;
+  }
+  return c;
+}
+function plafondPER(revenuPro){ // art. 154 bis (pro)
+  const r = Math.max(0, revenuPro);
+  return Math.max(P.per_min_p*P.PASS,
+    P.per_tx1*Math.min(r,8*P.PASS) + P.per_tx2*clamp(r-P.PASS,0,7*P.PASS));
+}
+function plafondPERperso(revenuPro){ // 163 quaterdecies (personnel) : 10% seulement
+  const r = Math.max(0, revenuPro);
+  return Math.max(P.per_min_p*P.PASS, P.per_tx1*Math.min(r,8*P.PASS));
+}
+function plafondPERdispo(inp, revRef){ // plafond annuel (selon canal) + reliquats 3 ans + conjoint mutualisé
+  const base = (inp.perCanal==='perso') ? plafondPERperso(revRef) : plafondPER(revRef);
+  return base + (inp.perRel||0) + (inp.marie ? (inp.perCj||0) : 0);
+}
+
+/* ============ MOTEUR BNC (exercice individuel) ============ */
+function simulateBNC(inp){
+  const {res, per, madelin, prof, conv, marie, enfants, autres} = inp;
+  const red = inp.red||0;
+  // Assiette réformée 2026 : super brut (bénéfice avant cotisations, facultatives réintégrées) − abattement 26%
+  const superBrut = Math.max(0, res);
+  const ab = superBrut<=0 ? 0 : clamp(superBrut*P.abat_tx, P.abat_min, P.abat_max);
+  const A = Math.max(0, superBrut - ab);
+  const cot = cotisations(A, prof, conv, inp.ijp||0);
+  // Bénéfice fiscal BNC : cotisations déductibles (hors CSG/CRDS ND) et Madelin déduits
+  const benef = res - (cot.total - cot.csgN) - madelin;
+  const plaf = plafondPERdispo(inp, Math.max(0, benef));
+  const perDed = Math.min(per, plaf);
+  const cred = inp.cred||0;
+  const baseFoyer = Math.max(0, benef - perDed + autres);
+  const irTot = Math.max(0, irFoyer(baseFoyer, marie, enfants, inp.isole) - red) - cred;
+  const irSans = Math.max(0, irFoyer(Math.max(0, autres), marie, enfants, inp.isole) - red) - cred;
+  const irBNC = Math.max(0, irTot - irSans);
+  const hauts = cehr(baseFoyer, marie);
+  const poche = Math.max(0, res - cot.total - madelin - irBNC - hauts - per);
+  return {
+    A, cot, benef, perDed, perExc: per - perDed, baseFoyer, irTot, irBNC, hauts,
+    tmi: tmi(baseFoyer, marie, enfants, inp.isole), plaf,
+    fluxs: { cot: cot.total, ir: irBNC + hauts, adm: madelin + per, poche }
+  };
+}
+
+/* Moteur complet : à partir des inputs, retourne tous les flux */
+function simulate(inp){
+  const {res, rem, div, cap, per, madelin, adm, prof, conv, split, pfu, marie, enfants, autres} = inp;
+  const red = inp.red||0;
+  const selas = inp.forme === 'selas';
+  let d = div, cot, A, resAvIS, is, divMax;
+  if (selas){
+    // Assimilé salarié : barème réel par tranches, pas de cotisations sur dividendes
+    const brut = brutFromNet(rem);
+    cot = cotisationsSELAS(brut);
+    cot.lignes = [['Salaire brut reconstitué', 0, '', brut, 'Info'], ...cot.lignes];
+    A = brut;
+    resAvIS = res - rem - cot.total - madelin - adm;
+    is = impotIS(resAvIS);
+    divMax = Math.max(0, resAvIS - is);
+    d = Math.min(div, divMax);
+  } else {
+    // Gérant majoritaire TNS : double itération — cotisations <-> brut social (réintégration)
+    // et cotisations <-> dividendes distribuables
+    let cotReint = 0, as = {brut:0, abat:0, A:0};
+    for (let i=0;i<24;i++){
+      const dTNS = Math.max(0, d - 0.10*cap);
+      as = assietteSociale(rem, cotReint, madelin, (inp.perCanal==='perso' ? 0 : per), dTNS);
+      A = as.A;
+      cot = cotisations(A, prof, conv, inp.ijp||0);
+      resAvIS = res - rem - cot.total - madelin - adm;
+      is = impotIS(resAvIS);
+      divMax = Math.max(0, resAvIS - is);
+      const nd = Math.min(div, divMax);
+      if (Math.abs(nd-d) < 1 && Math.abs(cot.total-cotReint) < 1) { d = nd; cotReint = cot.total; break; }
+      d = nd; cotReint = cot.total;
+    }
+    // Traçabilité de la cascade brut social → abattement → assiette (UI + PDF)
+    cot.brutSocial = as.brut; cot.abat = as.abat;
+    cot.lignes = [
+      ['Revenu brut social — rému nette '+fmt(rem)+' + cotisations réintégrées '+fmt(cot.total)+(madelin>0?' + Madelin '+fmt(madelin):'')+((per>0 && inp.perCanal!=='perso')?' + PER '+fmt(per):'')+((Math.max(0,d-0.10*cap))>0?' + div. >10% '+fmt(Math.max(0,d-0.10*cap)):''), 0, '', as.brut, 'Info'],
+      ['Abattement forfaitaire (remplace la déduction des cotisations · plancher '+fmt(P.abat_min)+' / plafond '+fmt(P.abat_max)+')', as.brut, pct(P.abat_tx), -as.abat, 'Info'],
+      ['= Assiette unique de cotisations et de CSG-CRDS', 0, '', as.A, 'Info'],
+      ...cot.lignes];
+  }
+  const divEff = d, divTNS = selas ? 0 : Math.max(0, divEff - 0.10*cap), divCap = divEff - divTNS;
+  const clipped = div > divEff + 1;
+  // PUMa : cotisation subsidiaire maladie (L.380-2) si revenus d'activité < 20% PASS et capital > 50% PASS
+  const revAct = rem + divTNS, revCap = divCap + Math.max(0, inp.autres||0)*0; // capital = dividendes part capital
+  let puma = 0;
+  if (revAct < P.puma_seuil_act*P.PASS && revCap > P.puma_abat_cap*P.PASS){
+    const assP = Math.min(revCap, P.puma_cap_max*P.PASS) - P.puma_abat_cap*P.PASS;
+    puma = P.puma_tx * assP * (1 - revAct/(P.puma_seuil_act*P.PASS));
+    cot.lignes.push(['Cotisation subsidiaire maladie PUMa (charge personnelle)', assP, pct(P.puma_tx), puma, 'Perso']);
+  }
+  // --- IR
+  let baseAct, perDed;
+  if (selas){
+    const impBrut = rem + cot.csgN; // net + CSG-CRDS non déductible
+    const netAbat = impBrut - clamp(impBrut*0.10, Math.min(P.abat10_min,impBrut), P.abat10_max);
+    perDed = Math.min(per, plafondPERperso(impBrut) + (inp.perRel||0) + (marie?(inp.perCj||0):0)); // salarié : plafond personnel
+    baseAct = netAbat - perDed;
+  } else {
+    const remBNC = rem*split, remA62 = rem*(1-split);
+    const a62net = remA62 - clamp(remA62*0.10, Math.min(P.abat10_min,remA62), P.abat10_max);
+    perDed = Math.min(per, plafondPERdispo(inp, rem + cot.csgN));
+    baseAct = remBNC + a62net + cot.csgN - perDed;
+  }
+  let divBar = 0, psDiv = divCap*P.ps_tx, pfuDiv = 0;
+  if (pfu){ pfuDiv = divEff*P.pfu_ir; }
+  else { divBar = divEff*(1-P.div_abat) - divCap*P.csg_ded; }
+  const baseFoyer = Math.max(0, baseAct + divBar + autres);
+  const baseSansSEL = Math.max(0, autres);
+  const cred = inp.cred||0;
+  const irTot = Math.max(0, irFoyer(baseFoyer, marie, enfants, inp.isole) - red) - cred;
+  const irSans = Math.max(0, irFoyer(baseSansSEL, marie, enfants, inp.isole) - red) - cred;
+  const irSEL = Math.max(0, irTot - irSans);
+  const rfr = baseFoyer + (pfu ? divEff : divEff*P.div_abat);
+  let hauts = cehr(rfr, marie);
+  // CDHR : imposition minimale de 20% du RFR (art. 224 CGI)
+  let cdhr = 0;
+  if (P.cdhr_on){
+    const S = marie ? P.cdhr_seuil_m : P.cdhr_seuil_c;
+    if (rfr > S){
+      const pfuTot = pfu ? divEff*P.pfu_ir : 0;
+      const irRetenu = irTot + hauts + pfuTot + P.cdhr_maj_pac*enfants + (marie ? P.cdhr_maj_couple : 0);
+      const base20 = Math.max(0, P.cdhr_tx*rfr - P.cdhr_decote*Math.max(0, 1.32*S - rfr));
+      cdhr = Math.max(0, base20 - irRetenu);
+      hauts += cdhr;
+    }
+  }
+  const impDiv = pfuDiv + psDiv;
+  const irTotal = irSEL + hauts + pfuDiv;
+  // --- Synthèse
+  const divNet = divEff - impDiv;
+  const netPoche = rem - perDed - (irSEL+hauts) + divNet - (per-perDed>0 ? 0 : 0) - (per - perDed); // PER non déduit reste versé
+  const reserves = divMax - divEff;
+  const coutSEL = rem + cot.total + madelin + adm + is + Math.min(per,rem); // per payé perso sur rému
+  return {
+    A, brutSocial: (cot.brutSocial!==undefined ? cot.brutSocial : A), abat: (cot.abat||0),
+    cot, resAvIS, is, divEff, divTNS, divCap, clipped, divMax,
+    perDed, perExc: per-perDed, baseAct, baseFoyer, irTot, irSans, irSEL, hauts, cdhr, rfr, tmi: tmi(baseFoyer,marie,enfants,inp.isole),
+    pfuDiv, psDiv, divNet, puma, netPoche: rem + divNet - irSEL - hauts - per - puma, reserves,
+    coutTotal: res - reserves, // ce qui "sort" réellement
+    fluxs: {
+      cot: cot.total + puma, is, ir: irSEL+hauts+pfuDiv+psDiv,
+      poche: Math.max(0, rem + divNet - irSEL - hauts - per - puma),
+      res: reserves, adm: adm + madelin + per
+    }
+  };
+}
+/* ============ UI ============ */
+const $ = id => document.getElementById(id);
+let state = { situ:'marie', pfu:true, mode:'manuel', remManuel:null, forme:'selarl', an1:'non', perCanal:'154bis' };
+
+function readInputs(){
+  return {
+    nom: $('i_nom').value || 'Client',
+    prof: $('i_prof').value,
+    conv: clamp((+$('i_conv').value||0)/100, 0, 1),
+    ijp: +$('i_ijp').value||0,
+    marie: state.situ==='marie',
+    isole: state.situ==='isole',
+    enfants: +$('i_enf').value||0,
+    autres: +$('i_autres').value||0,
+    red: +$('i_red').value||0,
+    cred: +$('i_cred').value||0,
+    res: +$('i_res').value||0,
+    cap: +$('i_cap').value||0,
+    split: (+$('i_split').value||0)/100,
+    adm: +$('i_adm').value||0,
+    rem: +$('i_rem').value||0,
+    div: +$('i_div').value||0,
+    pfu: state.pfu,
+    forme: state.forme,
+    per: +$('i_per').value||0,
+    perRel: +$('i_per_rel').value||0,
+    perCj: +$('i_per_cj').value||0,
+    perCanal: state.perCanal,
+    tdv: +$('i_tdv').value||0,
+    marge: (+$('i_marge').value||0)/100,
+    madelin: +$('i_mad').value||0
+  };
+}
+
+function catRow(l){
+  const taux = l[2]||'—';
+  const base = l[1]>0 ? fmt(l[1]) : '—';
+  return `<tr class="${l[3]<0?'sub':''}"><td>${l[0]}</td><td class="n">${base}</td><td class="n">${taux}</td><td class="n">${fmt(l[3])}</td></tr>`;
+}
+
+function render(){
+  window.__modeTdv = (state.mode==='tdv');
+  let inp = readInputs();
+  if (state.mode === 'tdv'){
+    const r = solveRemTDV(inp);
+    inp.rem = Math.min(Math.round(r.rem/1000)*1000, Math.floor(inp.res/1000)*1000);
+    $('i_rem').value = inp.rem;
+  }
+  // Calage sur brut social réel (2035 ligne DD) : résout la rémunération
+  const brutCible = +$('i_brutcible').value||0;
+  if (brutCible>0 && state.mode==='manuel' && inp.forme!=='selas'){
+    let lo=0, hi=Math.max(inp.res, brutCible);
+    for(let i=0;i<40;i++){ const m=(lo+hi)/2; (simulate({...inp, rem:m}).brutSocial < brutCible) ? lo=m : hi=m; }
+    inp.rem = Math.round(lo);
+    $('i_rem').value = inp.rem;
+  }
+  $('tdvfields').style.display = (state.mode === 'tdv') ? 'block' : 'none';
+  $('remfields').style.display = (state.mode === 'tdv') ? 'none' : 'block';
+  $('i_rem').disabled = (state.mode === 'tdv');
+  $('i_rem').style.opacity = (state.mode === 'tdv') ? .45 : 1;
+  $('btn_cale').style.display = (state.mode === 'tdv') ? 'none' : 'block';
+  const s = simulate(inp);
+  const profLbl = {dentiste:'Chirurgien-dentiste · CARCDSF', med_s1:'Médecin secteur 1 · CARMF', med_s2:'Médecin secteur 2 · CARMF', kine:'Kinésithérapeute · CARPIMKO', pharmacien:'Pharmacien titulaire · CAVP'}[inp.prof]
+    + (inp.forme==='selas' ? ' · SELAS (assimilé salarié)' : ' · SELARL (gérant maj. TNS)');
+  // le split BNC/62 ne concerne que la SELARL
+  $('i_split').closest('.f').style.display = inp.forme==='selas' ? 'none' : 'block';
+  $('v_rem').textContent = fmt(inp.rem) + (state.mode==='tdv' ? ' · auto' : '');
+  if (document.activeElement !== $('i_rem_n')) $('i_rem_n').value = inp.rem;
+  if (document.activeElement !== $('i_div_n')) $('i_div_n').value = inp.div;
+  $('i_rem_n').disabled = (state.mode === 'tdv');
+  $('v_div').textContent = fmt(inp.div);
+  $('v_per').textContent = fmt(inp.per);
+  $('v_split').textContent = inp.split*100+'% BNC / '+Math.round((1-inp.split)*100)+'% art. 62';
+  $('d_who').textContent = `${inp.nom} — ${profLbl} — ${inp.marie?'Marié':(inp.isole?'Parent isolé':'Célibataire')}, ${inp.enfants} enfant(s) — résultat avant rému ${fmt(inp.res)}`;
+  // warning dividendes
+  const w = $('w_div');
+  if (s.clipped){ w.classList.add('show'); w.textContent = `⚠ Résultat insuffisant : dividendes plafonnés à ${fmt(s.divEff)} (résultat net d'IS disponible).`; }
+  else if (s.resAvIS < 0){ w.classList.add('show'); w.textContent = `⚠ La rémunération + cotisations dépassent le résultat disponible de ${fmt(-s.resAvIS)}.`; }
+  else w.classList.remove('show');
+  // KPIs
+  const impots = s.is + s.irSEL + s.hauts + s.pfuDiv + s.psDiv;
+  const coutDir = inp.rem + s.cot.total + inp.madelin;
+  $('k_cout').textContent = fmt(coutDir);
+  $('k_cout_s').textContent = `soit ${(coutDir/Math.max(1,inp.rem)).toLocaleString('fr-FR',{maximumFractionDigits:2})} € décaissés pour 1 € de rému nette`;
+  $('k_cot').textContent = fmt(s.cot.total);
+  $('k_cot_s').textContent = `soit ${pct(s.cot.total/Math.max(1,inp.rem))} de la rému nette · brut social ${fmt(s.brutSocial)} − 26% → assiette ${fmt(s.A)}`;
+  $('k_imp').textContent = fmt(impots);
+  $('k_imp_s').textContent = `IS ${fmt(s.is)} · IR ${fmt(s.irSEL+s.hauts)} · Div ${fmt(s.pfuDiv+s.psDiv)} · TMI ${pct(s.tmi)}`;
+  $('k_net').textContent = fmt(s.fluxs.poche);
+  $('sb_net').textContent = fmt(s.fluxs.poche);
+  $('sb_prel').textContent = fmt(s.cot.total + impots);
+  $('k_net_s').textContent = `= rému ${fmt(inp.rem)} − IR ${fmt(s.irSEL+s.hauts)}${inp.per>0?` − PER ${fmt(inp.per)}`:''}${s.divNet>0?` + div. nets ${fmt(s.divNet)}`:''}${s.puma>0?` − PUMa ${fmt(s.puma)}`:''}`;
+  // Flux bar
+  const f = s.fluxs, tot = Math.max(1, f.cot+f.is+f.ir+f.poche+f.res+f.adm);
+  const seg = (cls,v,lbl) => v>0.005*tot ? `<div class="${cls}" style="width:${v/tot*100}%"><span>${lbl} ${fmt(v)}</span></div>` : '';
+  $('fluxbar').innerHTML = seg('fx-cot',f.cot,'Cotis.')+seg('fx-is',f.is,'IS')+seg('fx-ir',f.ir,'IR')+seg('fx-adm',f.adm,'PER+frais')+seg('fx-res',f.res,'Réserves')+seg('fx-poche',f.poche,'Poche');
+  $('f_sub').textContent = `Sur ${fmt(inp.res)} de résultat, ${pct(f.poche/tot)} arrive net dans votre poche — ${pct((f.cot+f.is+f.ir)/tot)} part en prélèvements.`;
+  // Trésorerie 1ère année (SELARL uniquement : provisionnel forfaitaire puis régularisation)
+  const an1 = state.an1==='oui' && inp.forme!=='selas';
+  let an1html = '';
+  if (an1){
+    const baseForf = P.forfait_debut * P.PASS;
+    const cotForf = cotisations(baseForf, inp.prof, inp.conv, 0);
+    const regul = s.cot.total - cotForf.total;
+    an1html = `<table class="tbl"><caption>⚠️ Trésorerie de la 1ère année — provisionnel & régularisation</caption>
+      <tr><th>Flux</th><th>Quand</th><th></th><th>Montant</th></tr>
+      <tr><td>Cotisations appelées en année 1 (base forfaitaire ${fmt(baseForf)})</td><td>N</td><td></td><td class="n">${fmt(cotForf.total)}</td></tr>
+      <tr><td>Cotisations réellement dues sur le revenu de l'année</td><td>—</td><td></td><td class="n">${fmt(s.cot.total)}</td></tr>
+      <tr class="tot"><td>Régularisation à payer en N+1 (à provisionner !)</td><td>N+1</td><td></td><td class="n">${fmt(Math.max(0,regul))}</td></tr>
+      <tr class="sub"><td>Année 2 : provisionnel appelé sur le revenu N + cette régularisation → trésorerie N+1 ≈</td><td>N+1</td><td></td><td class="n">${fmt(s.cot.total + Math.max(0,regul))}</td></tr>
+      <tr class="sub"><td colspan="4" style="text-align:left">La 1ère année paraît « légère » (${fmt(cotForf.total)} appelés) mais la vraie charge est ${fmt(s.cot.total)} : sans provision, l'année 2 cumule provisionnel + régularisation. Le simulateur raisonne en régime de croisière — cette table chiffre l'écart de trésorerie.</td></tr>
+    </table>`;
+  }
+  $('an1zone') && ($('an1zone').innerHTML = an1html);
+  // Coût global pour la SEL
+  const coutTot = coutDir + inp.adm;
+  const netApres = s.fluxs.poche;
+  $('tbl_cout').innerHTML = `<caption>Coût global du praticien pour la SEL</caption>
+    <tr><th>Poste</th><th></th><th></th><th>Montant</th></tr>
+    <tr><td>Rémunération versée (nette de cotisations, avant IR)</td><td></td><td></td><td class="n">${fmt(inp.rem)}</td></tr>
+    <tr><td>Cotisations sociales obligatoires (charge SEL)</td><td></td><td></td><td class="n">${fmt(s.cot.total)}</td></tr>
+    <tr><td>Madelin prévoyance (charge SEL)</td><td></td><td></td><td class="n">${fmt(inp.madelin)}</td></tr>
+    <tr class="tot"><td>Coût dirigeant total</td><td></td><td></td><td class="n">${fmt(coutDir)}</td></tr>
+    <tr><td>+ Surcoût administratif SEL</td><td></td><td></td><td class="n">${fmt(inp.adm)}</td></tr>
+    <tr class="tot"><td>Coût global annuel pour la SEL</td><td></td><td></td><td class="n">${fmt(coutTot)}</td></tr>
+    <tr class="sub"><td>Taux de charges apparent (cotisations / rému nette)</td><td></td><td></td><td class="n">${pct(s.cot.total/Math.max(1,inp.rem))}</td></tr>
+    <tr class="sub"><td>Pour 1 € net de rémunération, la SEL décaisse</td><td></td><td></td><td class="n">${(coutDir/Math.max(1,inp.rem)).toLocaleString('fr-FR',{maximumFractionDigits:2})} €</td></tr>
+    <tr class="sub"><td>Pour 1 € net dans la poche (après IR, div inclus), coût SEL global</td><td></td><td></td><td class="n">${netApres>0?((coutTot + s.is + s.divEff)/netApres).toLocaleString('fr-FR',{maximumFractionDigits:2}):'—'} €</td></tr>`;
+  // Détail cotisations
+  $('tbl_cot').innerHTML = `<caption>Cotisations sociales du praticien — ${profLbl}</caption>
+    <tr><th>Cotisation</th><th>Base</th><th>Taux</th><th>Montant</th></tr>`
+    + s.cot.lignes.map(catRow).join('')
+    + `<tr class="tot"><td>Total cotisations sociales</td><td></td><td></td><td class="n">${fmt(s.cot.total)}</td></tr>`;
+  // Cascade SEL
+  $('tbl_sel').innerHTML = `<caption>Cascade SEL — de l'EBE au dividende</caption>
+    <tr><th>Poste</th><th></th><th></th><th>Montant</th></tr>
+    <tr><td>Résultat avant rémunération</td><td></td><td></td><td class="n">${fmt(inp.res)}</td></tr>
+    <tr><td>− Rémunération versée au praticien (nette de cotisations, <b>avant IR</b>)</td><td></td><td></td><td class="n">−${fmt(inp.rem)}</td></tr>
+    <tr><td>− Cotisations sociales (charge SEL)</td><td></td><td></td><td class="n">−${fmt(s.cot.total)}</td></tr>
+    <tr><td>− Madelin prévoyance</td><td></td><td></td><td class="n">−${fmt(inp.madelin)}</td></tr>
+    <tr><td>− Surcoût administratif</td><td></td><td></td><td class="n">−${fmt(inp.adm)}</td></tr>
+    <tr class="tot"><td>Résultat imposable IS</td><td></td><td></td><td class="n">${fmt(Math.max(0,s.resAvIS))}</td></tr>
+    <tr><td>− IS (15% ≤ 42 500 € puis 25%)</td><td></td><td></td><td class="n">−${fmt(s.is)}</td></tr>
+    <tr><td>− Dividendes distribués</td><td></td><td></td><td class="n">−${fmt(s.divEff)}</td></tr>
+    <tr class="tot"><td>Mise en réserves</td><td></td><td></td><td class="n">${fmt(s.reserves)}</td></tr>`;
+  // IR
+  $('tbl_ir').innerHTML = `<caption>Impôt sur le revenu du foyer — barème 2026</caption>
+    <tr><th>Élément</th><th></th><th></th><th>Montant</th></tr>
+    <tr><td>Rémunération part BNC (${Math.round(inp.split*100)}%, sans abattement)</td><td></td><td></td><td class="n">${fmt(inp.rem*inp.split)}</td></tr>
+    <tr><td>Rémunération part art. 62 nette (abatt. 10%)</td><td></td><td></td><td class="n">${fmt(inp.rem*(1-inp.split)*0.9)}</td></tr>
+    <tr class="sub"><td>+ CSG/CRDS non déductible réintégrée</td><td></td><td></td><td class="n">${fmt(s.cot.csgN)}</td></tr>
+    <tr><td>− Versement PER déductible</td><td></td><td></td><td class="n">−${fmt(s.perDed)}</td></tr>
+    ${!inp.pfu ? `<tr><td>+ Dividendes au barème (abatt. 40%, CSG déd.)</td><td></td><td></td><td class="n">${fmt(s.divEff*0.6 - s.divCap*P.csg_ded)}</td></tr>`:''}
+    <tr><td>+ Autres revenus du foyer</td><td></td><td></td><td class="n">${fmt(inp.autres)}</td></tr>
+    <tr class="tot"><td>Revenu imposable du foyer</td><td></td><td></td><td class="n">${fmt(s.baseFoyer)}</td></tr>
+    <tr><td>IR total du foyer (QF, plafonnement, décote)</td><td></td><td></td><td class="n">${fmt(s.irTot)}</td></tr>
+    <tr class="sub"><td>dont attribuable à l'activité SEL</td><td></td><td></td><td class="n">${fmt(s.irSEL)}</td></tr>
+    ${s.hauts>0?`<tr><td>CEHR${s.cdhr>0?' + CDHR (plancher 20% du RFR '+fmt(s.rfr)+')':''}</td><td></td><td></td><td class="n">${fmt(s.hauts)}</td></tr>`:''}
+    <tr class="tot"><td>Taux marginal d'imposition</td><td></td><td></td><td class="n">${pct(s.tmi)}</td></tr>`;
+  $('tbl_div').innerHTML = `<caption>Fiscalité des dividendes — ${inp.pfu?'PFU (flat tax 30%)':'Barème progressif'}</caption>
+    <tr><th>Élément</th><th></th><th></th><th>Montant</th></tr>
+    <tr><td>Dividendes bruts distribués</td><td></td><td></td><td class="n">${fmt(s.divEff)}</td></tr>
+    <tr class="sub"><td>dont ≤ 10% du capital → prélèv. sociaux 17,2%</td><td></td><td></td><td class="n">${fmt(s.divCap)}</td></tr>
+    <tr class="sub"><td>dont > 10% du capital → cotisations TNS (inclus dans l'assiette sociale)</td><td></td><td></td><td class="n">${fmt(s.divTNS)}</td></tr>
+    ${inp.pfu?`<tr><td>IR forfaitaire 12,8%</td><td></td><td></td><td class="n">−${fmt(s.pfuDiv)}</td></tr>`:''}
+    <tr><td>Prélèvements sociaux 17,2% (part ≤ 10%)</td><td></td><td></td><td class="n">−${fmt(s.psDiv)}</td></tr>
+    <tr class="tot"><td>Dividendes nets ${inp.pfu?'':'(avant IR barème)'}</td><td></td><td></td><td class="n">${fmt(s.divNet)}</td></tr>`;
+  renderAlertes(inp, s);
+  renderBNC(inp, s);
+  renderMulti(inp);
+  renderCmp(inp);
+  renderTraj(inp);
+  renderPer(inp, s);
+  buildReport(inp, s, profLbl);
+}
+
+/* ============ PILOTAGE TRAIN DE VIE ============ */
+function besoinAnnuel(inp){ return inp.tdv*12*(1+inp.marge); }
+function solveRemTDV(inp){
+  const besoin = besoinAnnuel(inp);
+  let lo=0, hi=inp.res;
+  if (simulate({...inp, rem:hi}).fluxs.poche < besoin) return {rem:hi, ok:false, besoin};
+  for(let i=0;i<40;i++){
+    const m=(lo+hi)/2;
+    (simulate({...inp, rem:m}).fluxs.poche >= besoin) ? hi=m : lo=m;
+  }
+  return {rem: Math.ceil(hi/1000)*1000, ok:true, besoin};
+}
+
+/* ============ ALERTES ============ */
+function renderAlertes(inp, s){
+  const A = [];
+  const besoin = besoinAnnuel(inp);
+  const couv = besoin>0 ? s.fluxs.poche/besoin : 1;
+  const modeTdv = state.mode === 'tdv';
+  $('p_besoin').textContent = fmt(besoin) + ' (' + fmt(inp.tdv) + '/mois +' + Math.round(inp.marge*100) + '%)';
+  $('p_couv').textContent = pct(couv);
+  $('p_couv').style.color = couv>=1 ? 'var(--gold)' : '#FF9C9C';
+  $('p_pont').innerHTML = modeTdv ? `Pour disposer de <b style="color:#fff">${fmt(s.fluxs.poche)}</b> :<br>
+    Rému versée par la SEL <b style="color:#fff">${fmt(inp.rem)}</b> <span style="color:#7D89BE">(${fmt(Math.round(inp.rem/12))}/mois)</span><br>
+    − IR du foyer sur l'activité <b style="color:#FF9C9C">${fmt(s.irSEL + s.hauts)}</b><br>
+    ${inp.per>0?`− Versement PER <b style="color:#FF9C9C">${fmt(inp.per)}</b><br>`:''}
+    ${s.divNet>0?`+ Dividendes nets <b style="color:#fff">${fmt(s.divNet)}</b><br>`:''}
+    <span style="color:#7D89BE">Les cotisations sociales (${fmt(s.cot.total)}) sont payées en sus par la SEL.</span>` : '';
+  $('v_marge').textContent = '+' + Math.round(inp.marge*100) + '%';
+  if (besoin>0 && modeTdv){
+    if (couv < 1) A.push(['⛔', `<b>Train de vie non couvert</b> : le net en poche (${fmt(s.fluxs.poche)}) couvre ${pct(couv)} du besoin annuel de ${fmt(besoin)}. Manque ${fmt(besoin - s.fluxs.poche)} — utilisez « Caler la rémunération ».`]);
+    else if (couv > 1.35) A.push(['💡', `Net en poche ${fmt(s.fluxs.poche)} = ${pct(couv)} du besoin (${fmt(besoin)}). <b>${fmt(s.fluxs.poche - besoin)} sortis inutilement au barème</b> : envisager de réduire la rémunération et de basculer le surplus en dividendes ou réserves (bouton « Caler »).`]);
+    else A.push(['✅', `Train de vie couvert à ${pct(couv)} — rémunération bien calibrée (excédent de sécurité : ${fmt(s.fluxs.poche - besoin)}).`]);
+  }
+  const seuilTrim = 600*12.02; // 600 SMIC horaire = 4 trimestres
+  const trims = Math.min(4, Math.floor(s.A/(150*12.02)));
+  if (s.A < seuilTrim) A.push(['⚠️', `Assiette sociale ${fmt(s.A)} < ${fmt(seuilTrim)} : seulement <b>${trims} trimestre(s) de retraite validé(s)</b> cette année. Viser une rémunération d'au moins ~${fmt(Math.round(seuilTrim/0.74/100)*100)} pour sécuriser 4 trimestres.`]);
+  else A.push(['✅', `4 trimestres de retraite validés (assiette ${fmt(s.A)}).`]);
+  if (s.puma > 0) A.push(['⚠️', `<b>Taxe PUMa déclenchée : ${fmt(s.puma)}</b> (cotisation subsidiaire maladie 6,5% sur les revenus du capital, revenus d'activité < 20% du PASS). Une rémunération d'au moins ${fmt(Math.round(P.puma_seuil_act*P.PASS))} l'annule totalement — incluse dans le net en poche et le détail des cotisations.`]);
+  if (s.cdhr > 0) A.push(['⚠️', `<b>CDHR : ${fmt(s.cdhr)}</b> — le foyer est sous l'imposition minimale de 20% du RFR (${fmt(s.rfr)}). Sous ce plancher, les <b>réductions d'impôt perdent leur efficacité</b> ; en revanche les déductions (PER) restent utiles car elles abaissent le RFR. Autre levier : capitaliser en réserves pour repasser sous le seuil.`]);
+  if (s.tmi >= 0.41) A.push(['💡', `TMI à ${pct(s.tmi)} : chaque euro versé au PER économise ${pct(s.tmi)} d'IR. Disponible restant : <b>${fmt(Math.max(0, plafondPERdispo(inp, inp.rem + s.cot.csgN) - s.perDed))}</b>${inp.perRel>0?' (reliquats 3 ans inclus)':''}.`]);
+  if (s.perExc > 0) A.push(['⚠️', `PER : ${fmt(s.perExc)} versés <b>au-delà du plafond déductible</b> — sans effet fiscal cette année (report 3 ans possible).`]);
+  if (s.resAvIS > P.is_seuil) A.push(['💡', `Résultat IS ${fmt(s.resAvIS)} > seuil de 42 500 € : la tranche au-delà est imposée à 25% (vs 15%). Un ajustement de rémunération de ${fmt(s.resAvIS - P.is_seuil)} ramènerait tout au taux réduit.`]);
+  if (inp.forme!=='selas' && s.divTNS > 0) A.push(['ℹ️', `${fmt(s.divTNS)} de dividendes excèdent 10% du capital (${fmt(inp.cap)}) → soumis à <b>cotisations TNS</b> et non aux prélèvements sociaux de 17,2%. Augmenter le capital ou le compte courant relève ce seuil.`]);
+  if (inp.forme==='selas') A.push(['ℹ️', `<b>SELAS</b> : dividendes jamais soumis à cotisations (PS 17,2% seulement, quel que soit le capital) — mais 1 € net de salaire coûte ${(( inp.rem>0 ? (inp.rem + s.cot.total)/inp.rem : 2)).toLocaleString('fr-FR',{maximumFractionDigits:2})} € à la société. La stratégie « rému minimale + dividendes » y est souvent plus agressive qu'en SELARL. Retraite : régime général + Agirc-Arrco (droits proportionnels au brut).`]);
+  if (state.an1==='oui' && inp.forme!=='selas') A.push(['⚠️', `<b>1ère année</b> : cotisations appelées sur base forfaitaire — voir le tableau de trésorerie ci-dessous. Provisionner la régularisation N+1 est impératif.`]);
+  if (s.clipped) A.push(['⛔', `Dividendes demandés supérieurs au distribuable : plafonnés à ${fmt(s.divEff)}.`]);
+  // ---- Arbitrage canal PER (154 bis vs personnel) ----
+  if (inp.forme!=='selas' && inp.per>0){
+    const alt = simulate({...inp, perCanal: inp.perCanal==='perso' ? '154bis' : 'perso'});
+    const dCot = s.cot.total - alt.cot.total;         // >0 : l'autre canal coûte moins en cotisations
+    const dNet = (s.fluxs.poche + s.reserves) - (alt.fluxs.poche + alt.reserves);
+    if (Math.abs(dNet) > 300){
+      const lblCur = inp.perCanal==='perso' ? 'personnel (163 quaterd.)' : 'pro (154 bis)';
+      const lblAlt = inp.perCanal==='perso' ? 'pro (154 bis)' : 'personnel (163 quaterd.)';
+      A.push([dNet<0?'💡':'✅', `<b>Canal PER</b> : vous êtes en canal ${lblCur}. En canal ${lblAlt}, cotisations ${dCot>0?'−':'+'}${fmt(Math.abs(dCot))} et poche + réserves ${dNet<0?'+':'−'}${fmt(Math.abs(dNet))}/an${dNet<0?' — <b>l\'autre canal semble plus efficace</b> sur ce dossier (à valider : antériorité du contrat, plafonds réellement disponibles).':' — votre canal actuel est le bon.'}`]);
+    }
+  }
+  // ---- Garde-fous « usage en autonomie » ----
+  if (inp.madelin > 0){
+    // Plafond Madelin prévoyance art. 154 bis : 3,75% du revenu pro + 7% PASS, limité à 3% × 8 PASS
+    const revRef = inp.rem + s.cot.total; // approximation : rémunération allouée totale
+    const plafMad = Math.min(0.0375*revRef + 0.07*P.PASS, 0.03*8*P.PASS);
+    if (inp.madelin > plafMad) A.push(['⛔', `<b>Madelin prévoyance ${fmt(inp.madelin)} > plafond déductible estimé ${fmt(Math.round(plafMad))}</b> (3,75% du revenu + 7% PASS, max 3% × 8 PASS). L'excédent n'est pas déductible : ce point doit être validé par votre expert-comptable.`]);
+  }
+  if (inp.res > 0 && inp.res < 40000) A.push(['⚠️', `Résultat avant rémunération de ${fmt(inp.res)} : à ce niveau, l'intérêt même d'une SEL à l'IS est discutable (surcoûts fixes, cotisations minimales). Faire valider la structure avant tout arbitrage.`]);
+  if ((inp.autres||0) > 100000) A.push(['ℹ️', `Autres revenus du foyer élevés (${fmt(inp.autres)}) : le calcul suppose des revenus nets imposables simples. Revenus fonciers avec déficits, BIC, stock-options ou revenus étrangers ne sont pas modélisés — l'IR réel peut différer sensiblement.`]);
+  A.push(['📋', `<b>Périmètre de la simulation</b> — régime de croisière (pas de régularisations N-1/N-2 hors module 1ère année), hors CFE, frais réels, plafonnement des niches, situations familiales particulières. Paramètres 2026 au 09/07/2026, <b>sous réserve des textes définitifs (LF 2026 en cours)</b>. Cette simulation est un outil d'aide à la décision : elle ne remplace pas l'étude personnalisée validée par un expert-comptable.`]);
+  $('alist').innerHTML = A.map(a=>`<div style="padding:7px 0;border-bottom:1px dashed var(--line)">${a[0]} ${a[1]}</div>`).join('');
+}
+
+/* ============ BNC vs SEL ============ */
+function segBar(el, parts, tot){
+  el.innerHTML = parts.filter(p=>p[1]>0.005*tot)
+    .map(p=>`<div class="${p[0]}" style="width:${p[1]/tot*100}%"><span>${p[2]} ${fmt(p[1])}</span></div>`).join('');
+}
+function renderBNC(inp, sel){
+  const b = simulateBNC(inp);
+  window.__bnc = b;
+  const tot = Math.max(1, inp.res);
+  const selPatri = sel.fluxs.poche + sel.perDed + sel.reserves;
+  const bncPatri = b.fluxs.poche + b.perDed;
+  const dPoche = sel.fluxs.poche - b.fluxs.poche;
+  const dPatri = selPatri - bncPatri;
+  $('b_note').innerHTML = `Comparaison à résultat identique (<b>${fmt(inp.res)}</b> avant cotisations et rémunération). En BNC, tout le résultat est votre revenu : cotisations et IR calculés sur la totalité. En SEL, seule la rémunération (+ dividendes &gt; 10% du capital) supporte les cotisations — le solde est capitalisé à l'IS. <b>La SEL ne gagne que si vous ne sortez pas tout</b> : les réserves comptent comme patrimoine société, pas comme revenu disponible.`;
+  $('b_kpis').innerHTML = `
+    <div class="kpi"><div class="l">Net en poche BNC</div><div class="v num">${fmt(b.fluxs.poche)}</div><div class="s">TMI ${pct(b.tmi)} · cotis ${fmt(b.cot.total)}</div></div>
+    <div class="kpi"><div class="l">Net en poche SEL</div><div class="v num">${fmt(sel.fluxs.poche)}</div><div class="s">TMI ${pct(sel.tmi)} · cotis ${fmt(sel.cot.total)}</div></div>
+    <div class="kpi ${dPoche>=0?'poche':'social'}"><div class="l">Δ net immédiat (SEL − BNC)</div><div class="v num">${dPoche>=0?'+':''}${fmt(dPoche)}</div><div class="s">trésorerie personnelle annuelle</div></div>
+    <div class="kpi ${dPatri>=0?'poche':'social'}"><div class="l">Δ patrimoine global</div><div class="v num">${dPatri>=0?'+':''}${fmt(dPatri)}</div><div class="s">net + PER + réserves SEL vs net + PER</div></div>`;
+  segBar($('fluxbnc'), [['fx-cot',b.fluxs.cot,'Cotis.'],['fx-ir',b.fluxs.ir,'IR'],['fx-adm',b.fluxs.adm,'PER+Mad.'],['fx-poche',b.fluxs.poche,'Poche']], tot);
+  const f = sel.fluxs;
+  segBar($('fluxsel'), [['fx-cot',f.cot,'Cotis.'],['fx-is',f.is,'IS'],['fx-ir',f.ir,'IR'],['fx-adm',f.adm,'PER+frais'],['fx-res',f.res,'Réserves'],['fx-poche',f.poche,'Poche']], tot);
+  $('b_sub1').textContent = `${pct(b.fluxs.poche/tot)} du résultat en poche — prélèvements ${pct((b.fluxs.cot+b.fluxs.ir)/tot)}.`;
+  $('b_sub2').textContent = `${pct(f.poche/tot)} en poche + ${pct(f.res/tot)} capitalisés en réserves — prélèvements ${pct((f.cot+f.is+f.ir)/tot)}.`;
+  $('tbl_bnc').innerHTML = `<caption>Face à face détaillé</caption>
+    <tr><th>Poste</th><th>BNC (individuel)</th><th>SEL à l'IS</th><th>Écart</th></tr>
+    ${[
+      ['Assiette sociale', b.A, sel.A],
+      ['Cotisations sociales', b.cot.total, sel.cot.total],
+      ['Revenu imposable du foyer', b.baseFoyer, sel.baseFoyer],
+      ['IR (+ CEHR) attribuable', b.irBNC+b.hauts, sel.irSEL+sel.hauts],
+      ['IS', 0, sel.is],
+      ['Fiscalité dividendes', 0, sel.pfuDiv+sel.psDiv],
+      ['Total prélèvements', b.cot.total+b.irBNC+b.hauts, sel.cot.total+sel.is+sel.irSEL+sel.hauts+sel.pfuDiv+sel.psDiv],
+      ['Net en poche', b.fluxs.poche, sel.fluxs.poche],
+      ['PER déduit', b.perDed, sel.perDed],
+      ['Réserves capitalisées', 0, sel.reserves],
+      ['Patrimoine total créé', bncPatri, selPatri]
+    ].map((r,i,arr)=>{
+      const d = r[2]-r[1];
+      const tot = r[0].startsWith('Total')||r[0].startsWith('Patrimoine')||r[0].startsWith('Net');
+      return `<tr${tot?' class="tot"':''}><td>${r[0]}</td><td class="n">${fmt(r[1])}</td><td class="n">${fmt(r[2])}</td><td class="n" style="color:${(r[0].includes('poche')||r[0].includes('Patrimoine')||r[0].includes('PER')||r[0].includes('Réserves'))? (d>=0?'var(--poche)':'var(--social)') : (d<=0?'var(--poche)':'var(--social)')}">${d>=0?'+':''}${fmt(d)}</td></tr>`;
+    }).join('')}`;
+}
+
+/* ============ COMPARATEUR ============ */
+function solveFullRem(inp){ // rem max t.q. résultat après charges ≈ 0
+  let lo=0, hi=inp.res;
+  for(let i=0;i<40;i++){
+    const m=(lo+hi)/2;
+    const s = simulate({...inp, rem:m, div:0});
+    if (s.resAvIS > 0) lo=m; else hi=m;
+  }
+  return Math.floor(lo/100)*100;
+}
+function scen(inp, rem, div){
+  const s = simulate({...inp, rem, div: div===Infinity? inp.res : div});
+  return {rem, s, net: s.fluxs.poche, patri: s.fluxs.poche + s.perDed};
+}
+function renderCmp(inp){
+  $('c_res').textContent = fmt(inp.res);
+  const remFull = solveFullRem(inp);
+  const A = scen(inp, remFull, 0);
+  const B = scen(inp, inp.rem, inp.div);
+  const C = scen(inp, Math.min(P.PASS, remFull), Infinity);
+  // optimum : balayage grossier puis affinage au pas de 1 000 €
+  let best=null;
+  const pas = Math.max(2000, Math.round(remFull/60/1000)*1000);
+  for(let r=0;r<=remFull;r+=pas){
+    const t = scen(inp, r, Infinity);
+    if (!best || t.patri > best.patri) best = t;
+  }
+  for(let r=Math.max(0,best.rem-pas); r<=Math.min(remFull,best.rem+pas); r+=1000){
+    const t = scen(inp, r, Infinity);
+    if (t.patri > best.patri) best = t;
+  }
+  const D = best;
+  const E = scen(inp, Math.min(P.PASS, remFull), 0); // rému 1 PASS, zéro dividende, tout en réserves
+  const rtdv = solveRemTDV({...inp, div:0});
+  const Fx = scen(inp, Math.min(rtdv.rem, remFull), 0); // rému calée sur le train de vie, surplus en réserves
+  const list = [
+    {t:'A · Tout en rémunération', d:`Rému ${fmt(A.rem)}, aucun dividende. Retraite & prévoyance maximales.`, x:A},
+    {t:'B · Votre mix actuel', d:`Rému ${fmt(B.rem)} + dividendes ${fmt(B.s.divEff)}.`, x:B},
+    {t:'C · Rému 1 PASS + max dividendes', d:`Rému ${fmt(C.rem)} (valide 4 trimestres) + dividendes ${fmt(C.s.divEff)}.`, x:C},
+    {t:'D · Optimum Kopilot', d:`Rému ${fmt(D.rem)} + dividendes ${fmt(D.s.divEff)} — net + PER maximal (distribution immédiate).`, x:D},
+    {t:'E · Capitalisation en réserves', d:`Rému ${fmt(E.rem)}, zéro dividende : ${fmt(E.s.reserves)}/an capitalisés à l'IS — la stratégie « holding ». Voir l'onglet Trajectoire.`, x:E},
+    {t:'F · Calée sur le train de vie', d:`Rému ${fmt(Fx.rem)} = strict besoin (${fmt(besoinAnnuel(inp))}) couvert après IR et PER${rtdv.ok?'':' (résultat insuffisant)'} — surplus de ${fmt(Fx.s.reserves)}/an en réserves.`, x:Fx},
+  ];
+  const bestNet = Math.max(...list.map(l=>l.x.patri));
+  const T = Math.max(1, inp.res);
+  $('cmp').innerHTML = `<div class="cmplegend" style="grid-column:1/-1">
+      <span><i style="background:var(--poche)"></i>Poche + PER</span>
+      <span><i style="background:var(--social)"></i>Prélèvements (cotis. + IS + IR + fisc. div)</span>
+      <span><i style="background:#A9B4DE"></i>Réserves SEL</span>
+      <span><i style="background:#6E7691"></i>Prévoyance + frais</span>
+      <span style="margin-left:auto">Chaque barre répartit les <b>${fmt(inp.res)}</b> de résultat</span>
+    </div>` + list.map(l=>{
+    const x = l.x, sx = x.s;
+    const isBest = x.patri >= bestNet-1;
+    const poche = x.net, perV = inp.per, resv = sx.reserves;
+    const prel = sx.cot.total + (sx.puma||0) + sx.is + sx.irSEL + sx.hauts + sx.pfuDiv + sx.psDiv;
+    const prot = inp.madelin + inp.adm;
+    const patriTot = poche + perV + resv;
+    const bar = (c,v,t)=> v>0.004*T ? `<i title="${t} : ${fmt(v)}" style="width:${v/T*100}%;background:${c}"></i>` : '';
+    return `<div class="strat ${isBest?'best':''}">${isBest?'<span class="badge">Meilleur net immédiat</span>':''}
+      <h3>${l.t}</h3><div class="d">${l.d}</div>
+      <div class="big num">${fmt(x.patri)}</div>
+      <div class="pct">net en poche + PER, disponible <b>cette année</b></div>
+      <div class="pct" style="margin-top:-6px">+ réserves ${fmt(resv)} → patrimoine créé <b>${fmt(patriTot)}</b> (${pct(patriTot/T)} du résultat)</div>
+      <div class="minibar cmpbar">${bar('var(--poche)',poche+perV,'Poche + PER')}${bar('var(--social)',prel,'Prélèvements')}${bar('#A9B4DE',resv,'Réserves SEL')}${bar('#6E7691',prot,'Prévoyance + frais')}</div>
+      <div class="row"><span>Coût du praticien pour la SEL (rému + cotis. + prév.)</span><b>${fmt(x.rem + sx.cot.total + inp.madelin)}</b></div>
+      <div class="row"><span>Net en poche (après IR)</span><b>${fmt(poche)}</b></div>
+      <div class="row sub2"><span>dont dividendes nets perçus</span><b>${fmt(sx.divNet)}</b></div>
+      <div class="row"><span>Cotisations sociales (brut social ${fmt(sx.brutSocial)})</span><b>${fmt(sx.cot.total)}</b></div>
+      <div class="row"><span>IS payé par la SEL</span><b>${fmt(sx.is)}</b></div>
+      <div class="row"><span>IR + CEHR du foyer</span><b>${fmt(sx.irSEL+sx.hauts)}</b></div>
+      <div class="row"><span>Fiscalité des dividendes (PFU + PS)</span><b>${fmt(sx.pfuDiv+sx.psDiv)}</b></div>
+      <div class="row"><span>PER capitalisé</span><b>${fmt(perV)}</b></div>
+      <div class="row"><span>Reste en réserves SEL (après IS)</span><b>${fmt(resv)}</b></div>
+      <div class="row"><span>Base des droits acquis — retraite, IJ, prévoyance (= assiette sociale)</span><b>${fmt(sx.A)}</b></div>
+      <div class="row"><span>Couverture train de vie</span><b style="color:${poche>=besoinAnnuel(inp)?'var(--poche)':'var(--social)'}">${besoinAnnuel(inp)>0?pct(poche/besoinAnnuel(inp)):'—'} ${poche>=besoinAnnuel(inp)?'✓':'✗'}</b></div>
+      <div class="ctrl">Contrôle : poche ${fmt(poche)} + PER ${fmt(perV)} + prélèvements ${fmt(prel)} + réserves ${fmt(resv)} + prév./frais ${fmt(prot)} = <b>${fmt(poche+perV+prel+resv+prot)}</b></div>
+    </div>`;
+  }).join('');
+  window.__cmp = list;
+  $('tbl_cmp').innerHTML = `<caption>Comparaison détaillée</caption>
+    <tr><th>Poste</th>${list.map(l=>`<th>${l.t.split('·')[0]}</th>`).join('')}</tr>
+    ${[['Rémunération versée (nette de cotisations, avant IR)', l=>fmt(l.x.rem)],
+       ['Revenu brut social (rému + cotis. réintégrées + Madelin + PER + div. >10%)', l=>fmt(l.x.s.brutSocial)],
+       ['Assiette de cotisations (brut social − 26%)', l=>fmt(l.x.s.A)],
+       ['Cotisations sociales', l=>fmt(l.x.s.cot.total)],
+       ['Coût du praticien pour la SEL (rému+cotis+prév.)', l=>fmt(l.x.rem + l.x.s.cot.total + inp.madelin)],
+       ['Dividendes bruts', l=>fmt(l.x.s.divEff)],
+       ['IS', l=>fmt(l.x.s.is)],
+       ['IR + CEHR', l=>fmt(l.x.s.irSEL+l.x.s.hauts)],
+       ['Fiscalité dividendes (PFU + PS)', l=>fmt(l.x.s.pfuDiv+l.x.s.psDiv)],
+       ['PER déduit', l=>fmt(l.x.s.perDed)],
+       ['Net en poche', l=>fmt(l.x.net)],
+       ['Net + PER (dispo immédiat)', l=>fmt(l.x.patri)],
+       ['Réserves laissées en SEL (après IS)', l=>fmt(l.x.s.reserves)],
+       ['Patrimoine créé (poche + PER + réserves)', l=>fmt(l.x.patri + l.x.s.reserves)],
+       ['Contrôle : poche + PER + prélèvements + réserves + prév./frais', l=>fmt(l.x.net + inp.per + l.x.s.cot.total + (l.x.s.puma||0) + l.x.s.is + l.x.s.irSEL + l.x.s.hauts + l.x.s.pfuDiv + l.x.s.psDiv + l.x.s.reserves + inp.madelin + inp.adm)]
+      ].map(r=>`<tr${(r[0].startsWith('Net')||r[0].startsWith('Patrimoine'))?' class="tot"':(r[0].startsWith('Contrôle')?' class="sub"':'')}><td>${r[0]}</td>${list.map(l=>`<td class="n">${r[1](l)}</td>`).join('')}</tr>`).join('')}`;
+}
+
+/* ============ TRAJECTOIRE PLURIANNUELLE ============ */
+const TRAJ_COLORS = {A:'#FF6E6E', B:'#33479E', C:'#8D99C9', D:'#E08A12', E:'#001F6E', F:'#0E9F7E'};
+function project(sc, per, H, tdv, rp, rper, rsel, exitTax){
+  // sc : {net (poche annuelle), reserves (mise en réserves annuelle)}
+  let perso=0, perC=0, resC=0;
+  const pts=[0], short = Math.max(0, tdv - sc.net);
+  for(let t=1;t<=H;t++){
+    perso = perso*(1+rp) + Math.max(0, sc.net - tdv);
+    perC  = perC*(1+rper) + per;
+    resC  = resC*(1+rsel*0.75) + sc.reserves; // rendement net d'IS 25%
+    pts.push(perso + perC + resC*(1-exitTax) - short*t); // déficit de train de vie déduit
+  }
+  return {pts, perso, perC, resC, short, final: pts[H]};
+}
+function renderTraj(inp){
+  const cmp = window.__cmp; if(!cmp) return;
+  const H = +$('j_hor').value, tdv = besoinAnnuel(inp);
+  $('j_tdv_show').textContent = fmt(tdv);
+  const rp = (+$('j_rp').value||0)/100, rper = (+$('j_rper').value||0)/100, rsel = (+$('j_rsel').value||0)/100;
+  const exitTax = +$('j_exit').value;
+  const keys = ['A','B','C','D','E','F'];
+  const data = cmp.map((l,i)=>({key:keys[i], t:l.t, ...project({net:l.x.net, reserves:l.x.s.reserves}, l.x.s.perDed, H, tdv, rp, rper, rsel, exitTax)}));
+  window.__traj = {data, H, tdv, exitTax};
+  // --- SVG
+  const W=740, Ht=320, mx=62, my=22, iw=W-mx-16, ih=Ht-my-34;
+  const maxV = Math.max(...data.map(d=>Math.max(...d.pts)), 1);
+  const X = t=> mx + t/H*iw, Y = v=> my + ih - Math.max(0,v)/maxV*ih;
+  let svg='';
+  for(let g=0; g<=4; g++){
+    const v = maxV*g/4, y = Y(v);
+    svg += `<line x1="${mx}" y1="${y}" x2="${W-16}" y2="${y}" stroke="#E2E4EF" stroke-width="1"/>`;
+    svg += `<text x="${mx-6}" y="${y+3.5}" text-anchor="end" font-size="10" fill="#4A5680" font-family="Spline Sans Mono">${Math.round(v/1000)} k€</text>`;
+  }
+  for(let t=0;t<=H;t+= H<=10?1:5)
+    svg += `<text x="${X(t)}" y="${Ht-14}" text-anchor="middle" font-size="10" fill="#4A5680" font-family="Spline Sans Mono">${t===0?'an 0':t}</text>`;
+  data.forEach(d=>{
+    const path = d.pts.map((v,t)=>`${t?'L':'M'}${X(t).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+    svg += `<path d="${path}" fill="none" stroke="${TRAJ_COLORS[d.key]}" stroke-width="${(d.key==='D'||d.key==='F')?3.5:2.2}" ${d.key==='C'?'stroke-dasharray="5 4"':''} stroke-linecap="round"/>`;
+    svg += `<circle cx="${X(H)}" cy="${Y(d.final)}" r="4" fill="${TRAJ_COLORS[d.key]}"/>`;
+  });
+  $('trajsvg').innerHTML = svg;
+  $('j_leg').innerHTML = data.map(d=>`<span><i style="background:${TRAJ_COLORS[d.key]}"></i>${d.t}${d.short>0?' ⚠':''}</span>`).join('');
+  // --- KPIs
+  const best = data.reduce((a,b)=>b.final>a.final?b:a);
+  const ref = data[0];
+  $('j_sub').textContent = `Patrimoine net après fiscalité de sortie des réserves — horizon ${H} ans, train de vie ${fmt(tdv)}/an.`;
+  $('j_kpis').innerHTML = `
+    <div class="kpi poche"><div class="l">Meilleure trajectoire</div><div class="v num">${fmt(best.final)}</div><div class="s">${best.t}</div></div>
+    <div class="kpi sel"><div class="l">Écart vs tout rémunération</div><div class="v num">${best.final-ref.final>=0?'+':''}${fmt(best.final-ref.final)}</div><div class="s">sur ${H} ans, à effort identique</div></div>
+    <div class="kpi"><div class="l">Dont réserves SEL (nettes)</div><div class="v num">${fmt(best.resC*(1-exitTax))}</div><div class="s">sortie ${exitTax>0?('−'+Math.round(exitTax*100)+'%'):'brute'}</div></div>
+    <div class="kpi etat"><div class="l">Dont PER capitalisé</div><div class="v num">${fmt(best.perC)}</div><div class="s">avant fiscalité de sortie du PER</div></div>`;
+  // --- Table milestones
+  const miles = [1, Math.min(5,H), H].filter((v,i,a)=>a.indexOf(v)===i);
+  $('tbl_traj').innerHTML = `<caption>Patrimoine net cumulé — jalons</caption>
+    <tr><th>Stratégie</th>${miles.map(m=>`<th>An ${m}</th>`).join('')}<th>Épargne perso</th><th>PER</th><th>Réserves nettes</th></tr>
+    ${data.map(d=>`<tr${d.final>=best.final-1?' class="tot"':''}><td>${d.t}${d.short>0?` <span style="color:var(--social)">⚠ train de vie non couvert (−${fmt(d.short)}/an)</span>`:''}</td>${miles.map(m=>`<td class="n">${fmt(d.pts[m])}</td>`).join('')}<td class="n">${fmt(d.perso)}</td><td class="n">${fmt(d.perC)}</td><td class="n">${fmt(d.resC*(1-exitTax))}</td></tr>`).join('')}`;
+}
+
+/* ============ MULTI-ASSOCIÉS ============ */
+let MULTI = [
+  {nom:'Associé 1', rem:80000, part:50, marie:true, enfants:2, per:0},
+  {nom:'Associé 2', rem:80000, part:50, marie:true, enfants:0, per:0}
+];
+function multiAdd(){ if(MULTI.length<4){ MULTI.push({nom:'Associé '+(MULTI.length+1), rem:80000, part:0, marie:false, enfants:0, per:0}); render(); } }
+function multiDel(i){ MULTI.splice(i,1); render(); }
+function multiSet(i,k,v){ MULTI[i][k] = (k==='nom') ? v : (k==='marie' ? v==='1' : +v||0); render(); }
+function renderMulti(inp){
+  if (!$('m_rows')) return;
+  $('m_rows').innerHTML = MULTI.map((a,i)=>`
+    <div style="display:grid;grid-template-columns:1.2fr 1fr .6fr .8fr .5fr 1fr auto;gap:6px;align-items:end;margin-top:10px;padding:10px;background:#FBFCFA;border:1px solid var(--line);border-radius:10px">
+      <div class="f" style="margin:0"><label style="color:var(--ink-2)">Nom</label><input value="${a.nom}" onchange="multiSet(${i},'nom',this.value)" style="width:100%;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px"></div>
+      <div class="f" style="margin:0"><label style="color:var(--ink-2)">Rému nette €</label><input type="number" value="${a.rem}" step="5000" onchange="multiSet(${i},'rem',this.value)" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+      <div class="f" style="margin:0"><label style="color:var(--ink-2)">% cap.</label><input type="number" value="${a.part}" onchange="multiSet(${i},'part',this.value)" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+      <div class="f" style="margin:0"><label style="color:var(--ink-2)">Foyer</label><select onchange="multiSet(${i},'marie',this.value)" style="background:#fff;border:1px solid var(--line);color:var(--ink)"><option value="1" ${a.marie?'selected':''}>Marié</option><option value="0" ${!a.marie?'selected':''}>Célib.</option></select></div>
+      <div class="f" style="margin:0"><label style="color:var(--ink-2)">Enf.</label><input type="number" value="${a.enfants}" min="0" onchange="multiSet(${i},'enfants',this.value)" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+      <div class="f" style="margin:0"><label style="color:var(--ink-2)">PER €</label><input type="number" value="${a.per}" step="1000" onchange="multiSet(${i},'per',this.value)" style="background:#fff;border:1px solid var(--line);color:var(--ink)"></div>
+      <button onclick="multiDel(${i})" style="background:var(--social);border:none;color:#fff;border-radius:8px;padding:8px 10px;cursor:pointer;height:36px">✕</button>
+    </div>`).join('');
+  const divTot = +($('m_div').value||0);
+  const selas = inp.forme==='selas';
+  // 1. cotisations de chaque associé (itération sur les dividendes TNS individuels)
+  const rows = MULTI.map(a=>{
+    const part = a.part/100;
+    let dv = divTot*part, cot, A;
+    if (selas){ const brut=brutFromNet(a.rem); cot=cotisationsSELAS(brut); A=brut; }
+    else {
+      // dv fixe (prorata) mais itération cotisations <-> brut social (réintégration)
+      const dTNS = Math.max(0, dv - 0.10*inp.cap*part);
+      let cotReint = 0;
+      for(let k=0;k<15;k++){
+        const as = assietteSociale(a.rem, cotReint, 0, a.per, dTNS);
+        A = as.A;
+        cot = cotisations(A, inp.prof, inp.conv, 0);
+        if (Math.abs(cot.total-cotReint) < 1) break;
+        cotReint = cot.total;
+      }
+    }
+    return {a, part, dv, cot, A};
+  });
+  const totRemCot = rows.reduce((s,r)=>s+r.a.rem+r.cot.total,0);
+  const resAvIS = inp.res - totRemCot - inp.adm;
+  const is = impotIS(resAvIS);
+  const divMax = Math.max(0, resAvIS - is);
+  const divEff = Math.min(divTot, divMax);
+  // 2. fiscalité individuelle
+  rows.forEach(r=>{
+    const dv = divEff*r.part;
+    const dTNS = selas?0:Math.max(0, dv - 0.10*inp.cap*r.part);
+    const dCap = dv - dTNS;
+    const perDed = Math.min(r.a.per, plafondPER(r.a.rem + r.cot.csgN));
+    let base;
+    if (selas){ const ib=r.a.rem+r.cot.csgN; base = ib - clamp(ib*0.10,Math.min(P.abat10_min,ib),P.abat10_max) - perDed; }
+    else base = r.a.rem*inp.split + r.a.rem*(1-inp.split)*0.9 + r.cot.csgN - perDed;
+    const irT = Math.max(0, irFoyer(Math.max(0,base), r.a.marie, r.a.enfants));
+    const pfuD = dv*P.pfu_ir, psD = dCap*P.ps_tx;
+    r.dv=dv; r.ir=irT; r.impDiv=pfuD+psD; r.net = r.a.rem + dv - pfuD - psD - irT - r.a.per; r.perDed=perDed;
+  });
+  window.__multi = {rows, resAvIS, is, divEff, reserves: divMax-divEff};
+  $('tbl_multi').innerHTML = `<caption>Situation par associé (dividendes au PFU, foyers sans autres revenus)</caption>
+    <tr><th>Associé</th><th>Rému</th><th>Cotisations</th><th>Div. bruts</th><th>IR</th><th>Fisc. div.</th><th>Net en poche</th></tr>
+    ${rows.map(r=>`<tr><td>${r.a.nom} <span style="color:var(--ink-2)">(${r.a.part}%)</span></td><td class="n">${fmt(r.a.rem)}</td><td class="n">${fmt(r.cot.total)}</td><td class="n">${fmt(r.dv)}</td><td class="n">${fmt(r.ir)}</td><td class="n">${fmt(r.impDiv)}</td><td class="n"><b>${fmt(r.net)}</b></td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td class="n">${fmt(rows.reduce((s,r)=>s+r.a.rem,0))}</td><td class="n">${fmt(rows.reduce((s,r)=>s+r.cot.total,0))}</td><td class="n">${fmt(divEff)}</td><td class="n">${fmt(rows.reduce((s,r)=>s+r.ir,0))}</td><td class="n">${fmt(rows.reduce((s,r)=>s+r.impDiv,0))}</td><td class="n">${fmt(rows.reduce((s,r)=>s+r.net,0))}</td></tr>`;
+  const partSum = MULTI.reduce((s,a)=>s+a.part,0);
+  $('tbl_multi_sel').innerHTML = `<caption>Cascade SEL consolidée${partSum!==100?' — ⚠ parts = '+partSum+'% (≠100%)':''}</caption>
+    ${resAvIS<0?`<tr><td colspan="4" style="text-align:left;background:#FFECEC;color:var(--social);font-weight:600">⛔ Les rémunérations + cotisations dépassent le résultat de ${fmt(-resAvIS)} — la SEL ne peut pas financer ce niveau : réduire les rémunérations.</td></tr>`:''}
+    <tr><th>Poste</th><th></th><th></th><th>Montant</th></tr>
+    <tr><td>Résultat avant rémunérations</td><td></td><td></td><td class="n">${fmt(inp.res)}</td></tr>
+    <tr><td>− Rémunérations + cotisations des ${rows.length} associés</td><td></td><td></td><td class="n">−${fmt(totRemCot)}</td></tr>
+    <tr><td>− Surcoût administratif</td><td></td><td></td><td class="n">−${fmt(inp.adm)}</td></tr>
+    <tr class="tot"><td>Résultat imposable IS</td><td></td><td></td><td class="n">${fmt(Math.max(0,resAvIS))}</td></tr>
+    <tr><td>− IS</td><td></td><td></td><td class="n">−${fmt(is)}</td></tr>
+    <tr><td>− Dividendes distribués</td><td></td><td></td><td class="n">−${fmt(divEff)}</td></tr>
+    <tr class="tot"><td>Réserves</td><td></td><td></td><td class="n">${fmt(divMax-divEff)}</td></tr>`;
+}
+
+/* ============ PER ============ */
+function renderPer(inp, s){
+  const revRef = inp.rem + s.cot.csgN;
+  const base = (inp.perCanal==='perso') ? plafondPERperso(revRef) : plafondPER(revRef);
+  const plaf = plafondPERdispo(inp, revRef);
+  $('p_plaf').innerHTML = fmt(plaf) + ` <span style="font-size:.68rem;color:var(--ink-2);font-family:'Instrument Sans',sans-serif">= ${fmt(base)} ${inp.perCanal==='perso'?'(plafond personnel 163 quaterd.)':'(art. 154 bis pro)'}${inp.perRel>0?' + reliquats N-1/N-3 '+fmt(inp.perRel):''}${(inp.marie&&inp.perCj>0)?' + conjoint '+fmt(inp.perCj):''}</span>`;
+  const used = Math.min(inp.per, plaf);
+  $('p_gauge').style.width = Math.min(100, used/plaf*100)+'%';
+  $('p_use').textContent = `Versé : ${fmt(inp.per)}${s.perExc>0?` (dont ${fmt(s.perExc)} au-delà du plafond, non déductible)`:''}`;
+  $('p_rest').textContent = `Disponible restant : ${fmt(Math.max(0,plaf-used))}`;
+  const s0 = simulate({...inp, per:0});
+  const eco = (s0.irSEL+s0.hauts) - (s.irSEL+s.hauts);
+  $('tbl_per').innerHTML = `
+    <tr><th>Élément</th><th>Montant</th></tr>
+    <tr><td>Versement PER</td><td class="n">${fmt(inp.per)}</td></tr>
+    <tr><td>Économie d'IR immédiate (TMI ${pct(s.tmi)})</td><td class="n">−${fmt(eco)}</td></tr>
+    <tr class="tot"><td>Effort d'épargne réel</td><td class="n">${fmt(inp.per - eco)}</td></tr>
+    <tr><td>Rendement fiscal du versement</td><td class="n">${inp.per>0?pct(eco/inp.per):'—'}</td></tr>`;
+  const sm = simulate({...inp, per:plaf});
+  const ecoM = (s0.irSEL+s0.hauts) - (sm.irSEL+sm.hauts);
+  $('p_max').innerHTML = `En versant le plafond de <b class="num">${fmt(plaf)}</b>, l'économie d'IR atteint <b class="num" style="color:var(--poche)">${fmt(ecoM)}</b> : chaque euro placé ne coûte réellement que <b class="num">${(plaf>0?(1-ecoM/plaf):1).toLocaleString('fr-FR',{maximumFractionDigits:2})} €</b>. Capital retraite constitué : ${fmt(plaf)}/an.<br><span style="color:var(--ink-2)">Plafond mobilisable = plafond annuel du canal choisi + reliquats des 3 dernières années + plafond du conjoint mutualisé — saisissez-les dans le panneau de gauche. En canal 154 bis le versement est réintégré dans l'assiette sociale ; en canal personnel il en sort (voir l'alerte d'arbitrage de la synthèse).</span>`;
+}
+/* ============ PARAMÈTRES ÉDITABLES ============ */
+const EDITABLE = [
+  ['PASS','PASS 2026'],['abat_tx','Abattement assiette sociale'],['abat_max','Plafond abattement'],
+  ['csg_ded','CSG déductible'],['csg_nd','CSG/CRDS non déductible'],
+  ['rb_t1','Retraite base T1 (≤ 1 PASS)'],['rb_t2','Retraite base T2 (1–5 PASS)'],
+  ['is_t1','IS taux réduit'],['is_seuil','Seuil IS réduit'],['is_t2','IS taux normal'],
+  ['pfu_ir','PFU part IR'],['ps_tx','Prélèvements sociaux'],['qf_plaf','Plafonnement QF (½ part)'],
+  ['cd_rco_forf','CARCDSF forfait RCO'],['cd_rco_tx','CARCDSF taux RCO'],['cd_pcv_forf','PCV forfait dentiste'],['cd_id','Invalidité-décès dentiste'],
+  ['mf_rco_tx','CARMF taux RCO'],['mf_rco_plaf','CARMF plafond RCO'],['mf_asv_f1','ASV forfait S1'],['mf_asv_f2','ASV forfait S2'],
+  ['ij_tx','Taux IJ'],['af_tx','Alloc. familiales max'],['formation_tx','Formation prof.'],
+  ['as_mal','SELAS : maladie patronale'],['as_arrco2_p','SELAS : Agirc-Arrco T2 patronale'],['puma_tx','PUMa : taux'],['cdhr_on','CDHR active (1/0)'],['forfait_debut','1ère année : assiette forfaitaire (× PASS)']
+];
+function renderParams(){
+  $('pgrid').innerHTML = EDITABLE.map(([k,l])=>`<div class="f"><label>${l}</label><input type="number" step="any" data-p="${k}" value="${P[k]}"></div>`).join('')
+   ;
+  document.querySelectorAll('#pgrid input').forEach(i=>i.addEventListener('input',e=>{
+    P[e.target.dataset.p] = +e.target.value||0; render();
+  }));
+}
+
+/* ============ RAPPORT PDF ============ */
+function buildReport(inp, s, profLbl){
+  const LOGO = document.querySelector('.brand img') ? document.querySelector('.brand img').src : '';
+  const f = s.fluxs, tot = Math.max(1,f.cot+f.is+f.ir+f.poche+f.res+f.adm);
+  const RC={'fx-cot':'#FF6E6E','fx-is':'#33479E','fx-ir':'#001F6E','fx-poche':'#FFB559','fx-res':'#A9B4DE','fx-adm':'#6E7691'};
+  const seg = (cls,v,lbl)=> v>0.01*tot?`<div class="${cls}" style="width:${v/tot*100}%;background:${RC[cls]}"><span style="color:${(cls=='fx-poche'||cls=='fx-res')?'#001F6E':'#fff'}">${lbl}</span></div>`:'';
+  const today = new Date().toLocaleDateString('fr-FR');
+  const cmp = window.__cmp||[];
+  $('report').innerHTML = `
+  <div class="rp" style="display:flex;flex-direction:column;justify-content:space-between">
+    <div>
+      <div style="background:#001F6E;margin:-34px -38px 0;padding:60px 38px 40px;text-align:center">
+        <img src="${LOGO}" alt="Kopilot" style="height:64px;border-radius:10px">
+      </div>
+      <div style="height:6px;background:linear-gradient(90deg,#FFB559,#FF6E6E);margin:0 -38px"></div>
+      <div style="text-align:center;margin-top:90px">
+        <div style="font-family:'Archivo',sans-serif;font-weight:800;font-size:26px;color:#001F6E;letter-spacing:.01em">Étude de rémunération<br>&amp; d'optimisation fiscale et sociale</div>
+        <div style="font-size:12px;color:#4A5680;margin-top:10px">Exercice en société d'exercice libéral · Barèmes 2026</div>
+        <div style="margin-top:60px;font-family:'Archivo',sans-serif;font-weight:700;font-size:19px;color:#0E1726">${inp.nom}</div>
+        <div style="font-size:11px;color:#4A5680;margin-top:6px">${profLbl}</div>
+        <div style="font-size:11px;color:#4A5680;margin-top:2px">${today}</div>
+      </div>
+    </div>
+    <div>
+      <div style="border:1.2px solid #FF6E6E;border-radius:10px;padding:12px 16px;font-size:9.5px;color:#333;background:#FFF6F5">
+        <b style="color:#E85555">DOCUMENT STRICTEMENT CONFIDENTIEL</b> — Cette étude est établie à l'usage exclusif de son destinataire nommé ci-dessus. Elle contient des données personnelles, financières et fiscales protégées. Toute reproduction, diffusion ou communication à un tiers, totale ou partielle, est interdite sans l'accord écrit préalable de Kopilot et de son destinataire.
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:9px;color:#555">
+        <div>Préparé par <b>Kopilot Finance</b> · Expert-comptable signataire : Mickhaël Amsellem</div>
+        <div>kopilot · simulateur SEL v3.1 LG</div>
+      </div>
+    </div>
+  </div>
+  <div class="rp">
+    <div class="rhead"><img src="data:image/png;base64,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" alt="Kopilot">
+    <div style="font-size:9px;color:#555">Étude rémunération &amp; optimisation SEL · ${today}</div></div>
+    <h2 style="font-size:18px;margin-top:0">${inp.nom}</h2>
+    <div style="font-size:10px;color:#444;margin-bottom:10px">${profLbl} · ${inp.marie?'Marié/Pacsé':(inp.isole?'Parent isolé':'Célibataire')} · ${inp.enfants} enfant(s) · Exercice en SEL à l'IS · Barèmes 2026</div>
+    <div class="rkpis">
+      <div class="rkpi"><div class="l">Résultat avant rému</div><div class="v">${fmt(inp.res)}</div></div>
+      <div class="rkpi"><div class="l">Rémunération versée (avant IR)</div><div class="v">${fmt(inp.rem)}</div></div>
+      <div class="rkpi"><div class="l">Dividendes bruts</div><div class="v">${fmt(s.divEff)}</div></div>
+      <div class="rkpi" style="border-color:#FFB559;background:#FFF7EB"><div class="l">Net dans la poche</div><div class="v" style="color:#C87908">${fmt(f.poche)}</div></div>
+    </div>
+    <div style="font-size:10px;color:#333;margin:2px 0 6px;padding:6px 10px;background:#E9ECF8;border-radius:6px">
+      <b>Coût global du praticien pour la SEL : ${fmt(inp.rem + s.cot.total + inp.madelin)}</b> (rémunération nette + cotisations + prévoyance) — soit <b>${((inp.rem + s.cot.total + inp.madelin)/Math.max(1,inp.rem)).toLocaleString('fr-FR',{maximumFractionDigits:2})} €</b> décaissés pour 1 € de rémunération nette (taux de charges apparent : ${pct(s.cot.total/Math.max(1,inp.rem))}).
+    </div>
+    ${window.__modeTdv ? `<div style="background:#FFF7EB;border:1px solid #FFB559;border-radius:8px;padding:8px 12px;margin:8px 0;font-size:10px">
+      <b>Pilotage par le train de vie :</b> objectif ${fmt(inp.tdv)}/mois + ${Math.round(inp.marge*100)}% de marge de sécurité = besoin annuel net de <b>${fmt(besoinAnnuel(inp))}</b> — couvert à <b>${besoinAnnuel(inp)>0?pct(s.fluxs.poche/besoinAnnuel(inp)):'—'}</b> par la stratégie retenue. Principe : la rémunération (imposée au barème) est calibrée sur le besoin réel ; le surplus est arbitré en dividendes ou capitalisé en réserves.
+    </div>` : ''}
+    <h2>Où va chaque euro du résultat</h2>
+    <div class="fluxbar">${seg('fx-cot',f.cot,'Cotisations')+seg('fx-is',f.is,'IS')+seg('fx-ir',f.ir,'IR')+seg('fx-adm',f.adm,'PER+frais')+seg('fx-res',f.res,'Réserves')+seg('fx-poche',f.poche,'Net poche')}</div>
+    <div class="legend">
+      <span><i style="background:#FF6E6E"></i>Cotisations ${fmt(f.cot)}</span>
+      <span><i style="background:#33479E"></i>IS ${fmt(f.is)}</span>
+      <span><i style="background:#001F6E"></i>IR &amp; div. ${fmt(f.ir)}</span>
+      <span><i style="background:#6E7691"></i>PER+frais ${fmt(f.adm)}</span>
+      <span><i style="background:#A9B4DE"></i>Réserves ${fmt(f.res)}</span>
+      <span><i style="background:#FFB559"></i>Net ${fmt(f.poche)}</span>
+    </div>
+    <h2>Stratégies comparées — répartition du même résultat de ${fmt(inp.res)}</h2>
+    <table><tr><th>Stratégie</th><th>Rému</th><th>Dividendes</th><th>Cotisations</th><th>Impôts</th><th>Net poche</th><th>Net + PER</th><th>Réserves SEL</th><th>Patrimoine créé</th></tr>
+    ${cmp.map(l=>`<tr><td>${l.t}</td><td>${fmt(l.x.rem)}</td><td>${fmt(l.x.s.divEff)}</td><td>${fmt(l.x.s.cot.total)}</td><td>${fmt(l.x.s.is+l.x.s.irSEL+l.x.s.hauts+l.x.s.pfuDiv+l.x.s.psDiv)}</td><td>${fmt(l.x.net)}</td><td><b>${fmt(l.x.patri)}</b></td><td>${fmt(l.x.s.reserves)}</td><td><b>${fmt(l.x.patri+l.x.s.reserves)}</b></td></tr>`).join('')}
+    </table>
+    <div style="font-size:9.5px;color:#444;margin-top:4px">Toutes les stratégies répartissent le même résultat : poche + PER + prélèvements + réserves + prévoyance/frais = ${fmt(inp.res)}. Un net «&nbsp;faible&nbsp;» n'est pas perdu : il est capitalisé en réserves, dont la fiscalité de sortie est arbitrée dans la projection pluriannuelle.</div>
+    <div style="font-size:9.5px;color:#444;margin-top:6px">La stratégie «&nbsp;tout dividendes&nbsp;» réduit l'assiette de cotisations donc les droits retraite et la couverture prévoyance : l'arbitrage doit intégrer votre horizon patrimonial. Une rémunération d'au moins 1 PASS (${fmt(P.PASS)}) sécurise 4 trimestres et la prévoyance invalidité-décès.</div>
+    ${window.__bnc ? (()=>{ const b = window.__bnc;
+      const selPatri = s.fluxs.poche + s.perDed + s.reserves, bncPatri = b.fluxs.poche + b.perDed;
+      return `<h2>Exercice individuel (BNC) vs SEL à l'IS</h2>
+      <table><tr><th>Poste</th><th>BNC</th><th>SEL</th><th>Écart</th></tr>
+      <tr><td>Cotisations sociales</td><td>${fmt(b.cot.total)}</td><td>${fmt(s.cot.total)}</td><td>${fmt(s.cot.total-b.cot.total)}</td></tr>
+      <tr><td>IR (+ CEHR)</td><td>${fmt(b.irBNC+b.hauts)}</td><td>${fmt(s.irSEL+s.hauts)}</td><td>${fmt(s.irSEL+s.hauts-b.irBNC-b.hauts)}</td></tr>
+      <tr><td>IS + fiscalité dividendes</td><td>—</td><td>${fmt(s.is+s.pfuDiv+s.psDiv)}</td><td>+${fmt(s.is+s.pfuDiv+s.psDiv)}</td></tr>
+      <tr><td>Net en poche</td><td>${fmt(b.fluxs.poche)}</td><td>${fmt(s.fluxs.poche)}</td><td>${s.fluxs.poche-b.fluxs.poche>=0?'+':''}${fmt(s.fluxs.poche-b.fluxs.poche)}</td></tr>
+      <tr><td>Réserves capitalisées en société</td><td>—</td><td>${fmt(s.reserves)}</td><td>+${fmt(s.reserves)}</td></tr>
+      <tr class="tot"><td>Patrimoine total créé (net + PER + réserves)</td><td>${fmt(bncPatri)}</td><td>${fmt(selPatri)}</td><td><b>${selPatri-bncPatri>=0?'+':''}${fmt(selPatri-bncPatri)}</b></td></tr></table>
+      <div style="font-size:9.5px;color:#444">L'avantage SEL repose sur la capitalisation des réserves à l'IS : il suppose de ne pas distribuer l'intégralité du résultat. Les réserves restent un actif de la société (sortie ultérieure fiscalisée : dividendes, cession, holding…).</div>`;})() : ''}
+  </div>
+  <div class="rp">
+    <div class="rhead"><img src="data:image/png;base64,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" alt="Kopilot">
+    <div style="font-size:9px;color:#555">${inp.nom} · Détail des calculs · ${today}</div></div>
+    <h2>Cotisations sociales — ${profLbl}</h2>
+    <table><tr><th>Cotisation</th><th>Base</th><th>Taux</th><th>Montant</th></tr>
+    ${s.cot.lignes.map(l=>`<tr><td>${l[0]}</td><td>${l[1]>0?fmt(l[1]):'—'}</td><td>${l[2]||'—'}</td><td>${fmt(l[3])}</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td></td><td></td><td>${fmt(s.cot.total)}</td></tr></table>
+    <h2>Impôt sur le revenu &amp; dividendes</h2>
+    <table><tr><th>Élément</th><th>Montant</th></tr>
+    <tr><td>Revenu imposable du foyer</td><td>${fmt(s.baseFoyer)}</td></tr>
+    <tr><td>IR du foyer (barème 2026, QF plafonné, décote)</td><td>${fmt(s.irTot)}</td></tr>
+    <tr><td>dont attribuable à l'activité SEL</td><td>${fmt(s.irSEL)}</td></tr>
+    ${s.hauts>0?`<tr><td>Contribution exceptionnelle hauts revenus</td><td>${fmt(s.hauts)}</td></tr>`:''}
+    <tr><td>Taux marginal d'imposition</td><td>${pct(s.tmi)}</td></tr>
+    <tr><td>Dividendes — ${inp.pfu?'PFU 12,8% + PS 17,2%':'barème (abatt. 40%)'}</td><td>−${fmt(s.pfuDiv+s.psDiv)}</td></tr>
+    <tr class="tot"><td>Dividendes nets perçus</td><td>${fmt(s.divNet)}</td></tr></table>
+    <h2>Épargne retraite (PER / Madelin)</h2>
+    <table><tr><th>Élément</th><th>Montant</th></tr>
+    <tr><td>Plafond de déduction mobilisable 2026 (canal ${inp.perCanal==='perso'?'personnel':'154 bis'}${inp.perRel>0?' + reliquats':''})</td><td>${fmt(plafondPERdispo(inp, inp.rem + s.cot.csgN))}</td></tr>
+    <tr><td>Versement PER retenu</td><td>${fmt(s.perDed)}</td></tr>
+    <tr><td>Madelin prévoyance (charge SEL)</td><td>${fmt(inp.madelin)}</td></tr></table>
+    <div class="rfoot">Document de travail établi par Kopilot Finance — simulation indicative fondée sur les barèmes et taux 2026 (PASS ${fmt(P.PASS)}, barème IR 2026 sur revenus 2025, réforme de l'assiette sociale des indépendants). Elle ne prend pas en compte les régularisations de cotisations, les réductions et crédits d'impôt du foyer, ni les situations particulières de quotient familial. Les projections pluriannuelles reposent sur des hypothèses de rendement constantes, non garanties. Ne constitue ni un conseil en investissement ni une consultation fiscale — validation par votre expert-comptable requise avant toute décision. Kopilot Compta · Expert-comptable signataire : Mickhaël Amsellem. Document confidentiel — diffusion interdite.</div>
+  </div>
+  ${window.__traj ? (()=>{ const T = window.__traj; const best = T.data.reduce((a,b)=>b.final>a.final?b:a); const ref=T.data[0];
+    const maxF = Math.max(...T.data.map(d=>d.final),1);
+    return `<div class="rp">
+    <div class="rhead"><img src="${LOGO}" alt="Kopilot"><div style="font-size:9px;color:#555">${inp.nom} · Trajectoire patrimoniale · ${today}</div></div>
+    <h2>Trajectoire patrimoniale — horizon ${T.H} ans</h2>
+    <div style="font-size:9.5px;color:#444;margin-bottom:8px">Hypothèses : résultat constant, train de vie de ${fmt(T.tdv)}/an prélevé, surplus personnel et PER investis (rendements nets), réserves placées dans la SEL (rendement net d'IS), valorisées nettes de la fiscalité de sortie ${T.exitTax>0?('retenue ('+Math.round(T.exitTax*100)+'%)'):'(conservées en société)'}. Rendements non garantis.</div>
+    <table><tr><th>Stratégie</th><th>An 1</th><th>An ${Math.min(5,T.H)}</th><th>An ${T.H}</th><th>Épargne perso</th><th>PER</th><th>Réserves nettes</th></tr>
+    ${T.data.map(d=>`<tr${d.final>=best.final-1?' class="tot"':''}><td>${d.t}</td><td>${fmt(d.pts[1])}</td><td>${fmt(d.pts[Math.min(5,T.H)])}</td><td><b>${fmt(d.final)}</b></td><td>${fmt(d.perso)}</td><td>${fmt(d.perC)}</td><td>${fmt(d.resC*(1-T.exitTax))}</td></tr>`).join('')}</table>
+    <h2>Patrimoine net à l'an ${T.H}</h2>
+    ${T.data.map(d=>`<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><div style="width:170px;font-size:9px">${d.t}</div><div style="flex:1;background:#EEF0F8;border-radius:4px;height:13px"><div style="width:${Math.max(2,d.final/maxF*100)}%;height:13px;border-radius:4px;background:${TRAJ_COLORS[d.key]}"></div></div><div style="width:75px;text-align:right;font-family:Spline Sans Mono,monospace;font-size:9px">${fmt(d.final)}</div></div>`).join('')}
+    <div style="font-size:9.5px;color:#444;margin-top:10px"><b>Lecture :</b> à effort et résultat identiques, la stratégie « ${best.t} » crée <b>${fmt(best.final-ref.final)}</b> de patrimoine supplémentaire en ${T.H} ans par rapport au « tout rémunération ». La modalité de sortie des réserves (dividendes différés à la retraite, holding SPFPL, cession, apport-cession) détermine la fiscalité finale et fera l'objet d'une étude dédiée avec votre expert-comptable.</div>
+    <div class="rfoot">Projection pluriannuelle indicative — Kopilot Finance · Expert-comptable signataire : Mickhaël Amsellem. Document confidentiel — diffusion interdite.</div>
+  </div>`;})() : ''}
+  <div class="rp">
+    <div class="rhead"><img src="${LOGO}" alt="Kopilot"><div style="font-size:9px;color:#555">${inp.nom} · Comprendre les scénarios · ${today}</div></div>
+    <h2>Les 6 stratégies, en langage simple</h2>
+    <table><tr><th>Stratégie</th><th style="text-align:left">Ce que ça veut dire concrètement</th></tr>
+      <tr><td>A · Tout en rémunération</td><td style="text-align:left;font-family:'Instrument Sans',sans-serif">Vous videz le résultat en « salaire ». Cotisations et impôt maximaux tout de suite, mais retraite et prévoyance au plus haut. La référence prudente.</td></tr>
+      <tr><td>B · Votre mix actuel</td><td style="text-align:left;font-family:'Instrument Sans',sans-serif">La photo de ce que vous faites aujourd'hui, avec vos curseurs. Ni optimisée ni pénalisante : le point de départ de la discussion.</td></tr>
+      <tr><td>C · Rému 1 PASS + dividendes</td><td style="text-align:left;font-family:'Instrument Sans',sans-serif">Le minimum de rémunération qui valide 4 trimestres de retraite (${fmt(P.PASS)}), tout le reste en dividendes. Au-delà de 10% du capital, ces dividendes cotisent quand même — c'est la réponse du législateur (règle des 10%), qui rend le schéma légal et sans risque sérieux de requalification en SELARL, sous réserve du formalisme des distributions (bénéfices réels, AG, PV).</td></tr>
+      <tr><td>D · Optimum Kopilot</td><td style="text-align:left;font-family:'Instrument Sans',sans-serif">L'ordinateur teste tous les dosages rémunération/dividendes (au millier d'euros près) et retient celui qui met le plus d'argent net dans votre poche cette année, PER inclus.</td></tr>
+      <tr><td>E · Capitalisation en réserves</td><td style="text-align:left;font-family:'Instrument Sans',sans-serif">Petite rémunération, zéro dividende : l'argent reste dans la société. Cette carte paraît « mauvaise » à 1 an — sa richesse est invisible ici, elle se révèle dans la trajectoire.</td></tr>
+      <tr><td>F · Calée sur le train de vie</td><td style="text-align:left;font-family:'Instrument Sans',sans-serif">La rémunération exacte pour financer votre train de vie après impôt, pas un euro de plus au barème. Le surplus reste en société.</td></tr>
+    </table>
+    <h2>Comment lire la trajectoire (page précédente)</h2>
+    <div style="font-size:10px;line-height:1.55;font-family:'Instrument Sans',sans-serif">
+    Chaque ligne du tableau = une stratégie <b>répétée à l'identique chaque année</b> pendant ${window.__traj?window.__traj.H:10} ans. Le montant affiché = <b>tout ce que vous possédez à cette date</b> : votre épargne personnelle (le net non consommé, placé), votre PER, et les réserves de la société — déjà diminuées de l'impôt qu'il faudra payer pour les sortir.<br><br>
+    <b>Sécurité juridique :</b> réduire la rémunération au profit des dividendes est licite en SELARL — la règle des 10% intègre déjà les dividendes excédentaires aux cotisations, et une rémunération faible augmente l'IS (aucun préjudice pour le Trésor). Les conditions : des bénéfices distribuables réels et un formalisme d'assemblée irréprochable. En SELAS en revanche, la vigilance porte sur les rémunérations techniques, requalifiées en revenus TNS depuis 2023.<br><br>Trois idées à retenir. <b>1)</b> À un an, distribuer gagne toujours : l'argent est dans votre poche. <b>2)</b> Sur 10 ans, tout dépend de la <b>porte de sortie des réserves</b> : sortir en dividendes classiques coûte 30% (autant distribuer chaque année) ; sortir au départ en retraite via une cession bien préparée ne coûte que 17,2% — et là, capitaliser gagne. <b>3)</b> La rémunération reste la seule route qui construit votre <b>retraite et votre prévoyance</b> : la ligne « droits retraite » des cartes mesure ce capital invisible.</div>
+    <div class="rfoot">Guide de lecture — Kopilot Finance · Les stratégies C, D, E supposent une gouvernance et une trésorerie compatibles ; la sortie optimisée des réserves nécessite une étude dédiée. Expert-comptable signataire : Mickhaël Amsellem. Document confidentiel — diffusion interdite.</div>
+  </div>`;
+}
+
+/* ============ EXPORT PDF ============ */
+async function exportPDF(btn){
+  const rep = $('report');
+  const old = btn.textContent;
+  btn.textContent = '⏳ Génération…'; btn.disabled = true;
+  try{
+    if (!window.html2canvas || !window.jspdf) throw new Error('libs');
+    render(); // rapport à jour
+    rep.classList.add('rendering');
+    await new Promise(r=>setTimeout(r,150)); // fonts/layout
+    const pdf = new jspdf.jsPDF({unit:'mm', format:'a4', orientation:'portrait'});
+    const pages = rep.querySelectorAll('.rp');
+    for (let i=0;i<pages.length;i++){
+      const cv = await html2canvas(pages[i], {scale:2, backgroundColor:'#ffffff', logging:false, useCORS:true});
+      if (i>0) pdf.addPage();
+      let w = 210, hmm = cv.height*w/cv.width, x = 0;
+      if (hmm > 297){ w = 297*cv.width/cv.height; hmm = 297; x = (210-w)/2; }
+      pdf.addImage(cv.toDataURL('image/jpeg',0.92), 'JPEG', x, 0, w, hmm);
+    }
+    const nom = ($('i_nom').value||'Client').replace(/[^\w\-àâéèêëîïôùûç ]/gi,'').trim().replace(/\s+/g,'_');
+    const fname = `Kopilot_Etude_Remuneration_${nom}.pdf`;
+    const blob = pdf.output('blob');
+    const file = new File([blob], fname, {type:'application/pdf'});
+    let done = false;
+    const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+    // 1) Ordinateur : téléchargement classique direct (dossier Téléchargements)
+    if (!mobile){
+      try{
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        done = true;
+      }catch(e){}
+    }
+    // 2) Mobile : feuille de partage native (Fichiers, Mail, WhatsApp…)
+    if (!done && navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:'Étude rémunération Kopilot'}); done = true; }catch(e){ if(e.name==='AbortError') done = true; }
+    }
+    // 3) Secours : téléchargement direct (mobile sans partage)
+    if (!done){
+      try{
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        done = true;
+      }catch(e){}
+    }
+    // 3) Lien manuel dans un overlay (si le téléchargement auto est bloqué)
+    if (!done) showPdfOverlay(URL.createObjectURL(blob), fname);
+  }catch(e){
+    try{ window.print(); }
+    catch(e2){ alert("Export indisponible ici. Ouvrez le fichier dans Safari ou Chrome, puis réessayez."); }
+  }finally{
+    rep.classList.remove('rendering');
+    btn.textContent = old; btn.disabled = false;
+  }
+}
+
+function showPdfOverlay(url, fname){
+  let o = $('pdfoverlay');
+  if (!o){
+    o = document.createElement('div'); o.id='pdfoverlay';
+    o.style.cssText='position:fixed;inset:0;background:rgba(0,17,81,.85);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(o);
+  }
+  o.innerHTML = `<div style="background:#fff;border-radius:16px;padding:26px;max-width:340px;text-align:center">
+    <div style="font-family:Archivo,sans-serif;font-weight:800;color:#001F6E;font-size:1.05rem;margin-bottom:8px">Rapport prêt</div>
+    <div style="font-size:.82rem;color:#4A5680;margin-bottom:16px">Le téléchargement automatique est bloqué ici. Touchez le bouton pour ouvrir le PDF, puis utilisez le partage du navigateur.</div>
+    <a href="${url}" target="_blank" rel="noopener" style="display:block;background:#FF6E6E;color:#fff;font-family:Archivo,sans-serif;font-weight:700;padding:13px;border-radius:10px;text-decoration:none;margin-bottom:10px">Ouvrir ${fname}</a>
+    <button onclick="document.getElementById('pdfoverlay').remove()" style="background:none;border:none;color:#4A5680;font-size:.8rem;cursor:pointer">Fermer</button>
+  </div>`;
+}
+
+/* ============ WIRING ============ */
+/* ============ MODE LEAD-GEN ============ */
+const LEAD_CFG = {
+  rdvUrl: 'https://calendly.com/VOTRE-LIEN-KOPILOT',   // <-- À REMPLACER
+  mail:   'contact@kopilot-finance.fr'                  // <-- À REMPLACER
+};
+const LEAD_LOCKED = ['t_cmp','t_traj','t_multi','t_per','t_param'];
+function lgCTA(){ window.open(LEAD_CFG.rdvUrl, '_blank'); }
+function lgLock(){
+  LEAD_LOCKED.forEach(id=>{
+    const pane = document.getElementById(id);
+    if (!pane || pane.dataset.locked) return;
+    pane.dataset.locked = '1';
+    const inner = document.createElement('div');
+    inner.className = 'lockcontent';
+    while (pane.firstChild) inner.appendChild(pane.firstChild);
+    pane.appendChild(inner);
+    pane.classList.add('lockwrap');
+    const titles = {t_cmp:'Comparateur de stratégies', t_traj:'Trajectoire patrimoniale 10 ans', t_multi:'Module multi-associés', t_per:'Optimisation PER', t_param:'Paramètres détaillés'};
+    const ovl = document.createElement('div');
+    ovl.className = 'lockovl';
+    ovl.innerHTML = `<div style="font-size:2rem">🔒</div>
+      <h3>${titles[id]||'Module avancé'} — réservé à l'étude complète</h3>
+      <p>Ce module compare vos stratégies de rémunération, chiffre l'optimum et projette votre patrimoine à 10 ans. Il est délivré lors de l'étude personnalisée réalisée avec un expert-comptable Kopilot, seule à faire foi pour une décision.</p>
+      <a class="cta" href="#" onclick="lgCTA();return false">📅 Obtenir mon étude complète — prendre RDV</a>
+      <p style="font-size:.72rem">ou écrivez-nous : <a href="mailto:${LEAD_CFG.mail}">${LEAD_CFG.mail}</a></p>`;
+    pane.appendChild(ovl);
+  });
+}
+document.addEventListener('DOMContentLoaded', lgLock); lgLock();
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); $(b.dataset.t).classList.add('on');
+}));
+[['i_situ','situ'],['i_pfu','pfu'],['i_mode','mode'],['i_forme','forme'],['i_an1','an1'],['i_per_canal','perCanal']].forEach(([id,key])=>{
+  document.querySelectorAll('#'+id+' button').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    if (key==='mode'){
+      if (b.dataset.v==='tdv' && state.mode!=='tdv') state.remManuel = +$('i_rem').value; // sauvegarde
+      if (b.dataset.v==='manuel' && state.mode==='tdv'){
+        $('i_rem').value = (state.remManuel && state.remManuel>0) ? state.remManuel : 100000;
+        ['i_rem','i_rem_n'].forEach(x=>{ $(x).disabled=false; $(x).removeAttribute('disabled'); $(x).style.pointerEvents='auto'; $(x).style.opacity=1; });
+      } // restauration
+    }
+    state[key] = key==='pfu' ? b.dataset.v==='pfu' : b.dataset.v;
+    render();
+  }));
+});
+['i_nom','i_prof','i_conv','i_ijp','i_enf','i_autres','i_red','i_cred','i_res','i_cap','i_split','i_adm','i_brutcible','i_rem','i_div','i_per','i_per_rel','i_per_cj','i_mad','j_hor','j_rp','j_rper','j_rsel','j_exit','m_div']
+  .forEach(id=>$(id).addEventListener('input', render));
+// Jumeaux slider <-> champ numérique
+[['i_rem','i_rem_n'],['i_div','i_div_n']].forEach(([sl,nb])=>{
+  $(nb).addEventListener('input',()=>{ if($(nb).value==='') return; $(sl).value = Math.max(0,+$(nb).value||0); render(); });
+});
+
+if (window.innerWidth < 980){
+  // Sur mobile : blocs SEL & PER repliés, Dossier + Arbitrage ouverts
+  document.querySelectorAll('.cockpit .grp').forEach((g,i)=>{ if(i===1 || i===4) g.removeAttribute('open'); });
+}
+document.querySelectorAll('#i_tdvpre button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#i_tdvpre button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); $('i_tdv').value = b.dataset.v; render();
+}));
+$('btn_cale').addEventListener('click',()=>{
+  const r = solveRemTDV(readInputs());
+  $('i_rem').value = Math.min(r.rem, +$('i_rem').max||r.rem);
+  render();
+  if(!r.ok) alert('Même au maximum, le résultat ne permet pas de couvrir ce train de vie avec ces dividendes.');
+});
+['i_tdv','i_marge'].forEach(id=>$(id).addEventListener('input', render));
+document.querySelectorAll('input[type=number]').forEach(i=>{ i.setAttribute('inputmode','numeric'); });
+if (window.self !== window.top){
+  const b=document.createElement('div');
+  b.className='noprint';
+  b.style.cssText='background:#FFF3DC;border:1px solid #FFB559;color:#5C4300;font-size:.78rem;padding:9px 14px;border-radius:10px;margin-bottom:14px';
+  b.innerHTML='⚠️ <b>Mode aperçu détecté</b> : les téléchargements de fichiers sont bloqués ici. Pour l\'export PDF, ouvrez le fichier dans Chrome/Safari ou utilisez la version en ligne (Vercel).';
+  document.querySelector('.deck').prepend(b);
+}
+renderParams();
+render();
+</script>
+</body>
+</html>
